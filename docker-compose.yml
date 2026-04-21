@@ -1,0 +1,276 @@
+version: "3.8"
+
+services:
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - nginx-certs:/etc/nginx/certs:ro
+      - nginx-vhost:/etc/nginx/vhost.d
+      - nginx-html:/usr/share/nginx/html
+    labels:
+      - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy
+    networks:
+      service_network:
+
+  letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    restart: always
+    environment:
+      - NGINX_PROXY_CONTAINER=nginx-proxy
+    volumes:
+      - nginx-certs:/etc/nginx/certs:rw
+      - nginx-vhost:/etc/nginx/vhost.d
+      - nginx-html:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  #PHP
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    working_dir: /var/www/html
+    environment:
+      - APP_ENV=production
+    volumes:
+      - ./:/var/www/html
+      - nginx-certs:/etc/nginx/certs:ro
+    networks:
+      service_network:
+
+  # #Nginx Service
+  webserver:
+    image: nginx:alpine
+    container_name: webserver
+    restart: unless-stopped
+    tty: true
+    depends_on:
+      - app
+    expose:
+      - 80
+    environment:
+      - VIRTUAL_HOST=back.toggolac.com,www.back.toggolac.com
+      - LETSENCRYPT_HOST=back.toggolac.com,www.back.toggolac.com
+      - LETSENCRYPT_EMAIL=toggolac@gmail.com
+    volumes:
+      - ./:/var/www/html:ro
+      - ./docker/nginx_w/conf.d:/etc/nginx/conf.d
+      - nginx-certs:/etc/nginx/certs:ro
+    command: [nginx-debug, "-g", "daemon off;"]
+    networks:
+      service_network:
+  
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laravel_scheduler
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+    entrypoint: |
+      bash -c 'while true; do php /var/www/html/artisan schedule:run --no-interaction; sleep 7200; done' 
+    networks:
+      - service_network
+
+  # #Nginx Service
+  webserver-ssr:
+    image: nginx:alpine
+    container_name: webserver-ssr
+    restart: unless-stopped
+    tty: true
+    depends_on:
+      - frontend
+    expose:
+      - 80
+    environment:
+      - VIRTUAL_HOST=toggolac.com,www.toggolac.com
+      - LETSENCRYPT_HOST=toggolac.com,www.toggolac.com
+      - LETSENCRYPT_EMAIL=toggolac@gmail.com
+    volumes:
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+      - nginx-certs:/etc/nginx/certs:ro
+    command: [nginx-debug, "-g", "daemon off;"]
+    networks:
+      service_network:
+
+  frontend:
+    image: toggolac/toggolac:1.1.0
+    container_name: toggolac
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    working_dir: /home/node/webserver
+    environment:
+      - VIRTUAL_HOST=toggolac.com,www.toggolac.com
+      - LETSENCRYPT_HOST=toggolac.com,www.toggolac.com
+      - LETSENCRYPT_EMAIL=toggolac@gmail.com
+    volumes:
+      - nginx-certs:/etc/nginx/certs:ro
+    networks:
+      service_network:
+
+  frontendAdm:
+    image: toggolac/toggolac_adm:1.0.7
+    container_name: toggolac-adm
+    restart: unless-stopped
+    tty: true
+    expose:
+      - 80
+    environment:
+      - VIRTUAL_HOST=adm.toggolac.com,www.adm.toggolac.com
+      - LETSENCRYPT_HOST=adm.toggolac.com,www.adm.toggolac.com
+      - LETSENCRYPT_EMAIL=toggolac@gmail.com
+    volumes:
+      - nginx-certs:/etc/nginx/certs:ro
+    command: [nginx-debug, "-g", "daemon off;"]
+    networks:
+      service_network:
+  #MySQL Service
+  db:
+    image: mysql:5.7
+    container_name: db
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "3306:3306"
+    environment:
+       MYSQL_DATABASE: toggolac
+       MYSQL_ROOT_PASSWORD: p78ichDi
+       MYSQL_USER: adm_toggolac
+       MYSQL_PASSWORD: FEUyScnDtwQBUTt8Y:3j
+    volumes:
+      - vol_mysql:/var/lib/mysql/
+    networks:
+      service_network:
+  #TEST
+   #PHP
+  app-test:
+    image: toggolac/back_test:1.0.10
+    container_name: app-test
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    working_dir: /var/www/html
+    volumes:
+      - html:/var/www/html
+      - storage:/var/www/html/storage
+    env_file:
+      - /root/secret.env
+    networks:
+      service_network:
+
+  # #Nginx Service
+  webserver-test:
+    image: nginx:alpine
+    container_name: webserver-test
+    restart: unless-stopped
+    tty: true
+    depends_on:
+      - app-test
+    expose:
+      - 80
+    environment:
+      - VIRTUAL_HOST=test-back.toggolac.com,www.test-back.toggolac.com
+      - LETSENCRYPT_HOST=test-back.toggolac.com,www.test-back.toggolac.com
+      - LETSENCRYPT_EMAIL=toggolac@gmail.com
+    volumes:
+      - ./docker/nginx_w_test/conf.d:/etc/nginx/conf.d
+      - nginx-certs:/etc/nginx/certs:ro
+    command: [nginx-debug, "-g", "daemon off;"]
+    networks:
+    - service_network
+  # #Nginx Service
+  webserver-ssr-test:
+    image: nginx:alpine
+    container_name: webserver-ssr-test
+    restart: unless-stopped
+    tty: true
+    depends_on:
+      - frontend-test
+    expose:
+      - 80
+    environment:
+      - VIRTUAL_HOST=toggolac.com,www.toggolac.com
+      - LETSENCRYPT_HOST=toggolac.com,www.toggolac.com
+      - LETSENCRYPT_EMAIL=toggolac@gmail.com
+    volumes:
+      - ./docker/nginx_test/conf.d:/etc/nginx/conf.d
+      - nginx-certs:/etc/nginx/certs:ro
+    command: [nginx-debug, "-g", "daemon off;"]
+    networks:
+      - service_network
+
+  frontend-test:
+    image: toggolac/toggolac:1.0.35
+    container_name: toggolac-test
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    working_dir: /home/node/webserver
+    environment:
+      - VIRTUAL_HOST=test.toggolac.com,www.test.toggolac.com
+      - LETSENCRYPT_HOST=test.toggolac.com,www.test.toggolac.com
+      - LETSENCRYPT_EMAIL=toggolac@gmail.com
+    volumes:
+      - node_modules-test:/home/node/webserver/node_modules
+      - nginx-certs:/etc/nginx/certs:ro
+    networks:
+      service_network:
+
+  frontendAdm-test:
+    image: toggolac/toggolac_adm_test:1.0.13
+    container_name: toggolac-adm-test
+    restart: unless-stopped
+    tty: true
+    expose:
+      - 80
+    environment:
+      - VIRTUAL_HOST=test-adm.toggolac.com,www.test-adm.toggolac.com
+      - LETSENCRYPT_HOST=test-adm.toggolac.com,www.test-adm.toggolac.com
+      - LETSENCRYPT_EMAIL=toggolac@gmail.com
+    volumes:
+      - nginx-certs:/etc/nginx/certs:ro
+    command: [nginx-debug, "-g", "daemon off;"]
+    networks:
+      service_network:
+  #MySQL Service TEST
+  db-test:
+    image: mysql:5.7
+    container_name: db-test
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "3307:3306"
+    environment:
+       MYSQL_DATABASE: toggolac-test
+       MYSQL_ROOT_PASSWORD: p78ichDi
+       MYSQL_USER: adm_toggolac
+       MYSQL_PASSWORD: FEUyScnDtwQBUTt8Y:3j
+    volumes:
+      - vol_mysql-test:/var/lib/mysql/
+    networks:
+      service_network:
+
+networks:
+  service_network:
+
+volumes:
+  vol_mysql:
+  vol_mysql-test:
+  nginx-certs:
+  nginx-vhost:
+  nginx-html:
+  html:
+  storage:
+  node_modules:
+  node_modules-test:

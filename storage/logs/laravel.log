@@ -1,0 +1,26 @@
+[2024-10-23 12:53:34] local.ERROR: Trait "Laravel\Scout\Searchable" not found {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Trait \"Laravel\\Scout\\Searchable\" not found at /Users/wilcoxmain/WilcoxMarin/work/github/toggo_production/app/Models/Product.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2024-10-23 12:53:49] local.ERROR: Trait "Laravel\Scout\Searchable" not found {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Trait \"Laravel\\Scout\\Searchable\" not found at /Users/wilcoxmain/WilcoxMarin/work/github/toggo_production/app/Models/Product.php:10)
+[stacktrace]
+#0 {main}
+"} 
+[2026-04-20 16:15:55] local.ERROR: Cannot redeclare App\Http\Controllers\UserController::formatUser() {"userId":370,"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot redeclare App\\Http\\Controllers\\UserController::formatUser() at /Users/diegorodriguez/Documents/TOGGOLAC CODE/TOGGOLAC_PRODUCTION-main-2/app/Http/Controllers/UserController.php:281)
+[stacktrace]
+#0 {main}
+"} 
+[2026-04-20 16:15:55] local.ERROR: Cannot redeclare App\Http\Controllers\UserController::formatUser() {"userId":370,"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot redeclare App\\Http\\Controllers\\UserController::formatUser() at /Users/diegorodriguez/Documents/TOGGOLAC CODE/TOGGOLAC_PRODUCTION-main-2/app/Http/Controllers/UserController.php:281)
+[stacktrace]
+#0 {main}
+"} 
+[2026-04-20 16:15:57] local.ERROR: dLocal createCheckout 4xx: {"code":3003,"message":"Merchant has no authorization to use this API."}  
+[2026-04-20 16:16:52] local.ERROR: Cannot redeclare App\Http\Controllers\UserController::formatUser() {"userId":370,"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot redeclare App\\Http\\Controllers\\UserController::formatUser() at /Users/diegorodriguez/Documents/TOGGOLAC CODE/TOGGOLAC_PRODUCTION-main-2/app/Http/Controllers/UserController.php:281)
+[stacktrace]
+#0 {main}
+"} 
+[2026-04-20 16:16:53] local.ERROR: Cannot redeclare App\Http\Controllers\UserController::formatUser() {"userId":370,"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Cannot redeclare App\\Http\\Controllers\\UserController::formatUser() at /Users/diegorodriguez/Documents/TOGGOLAC CODE/TOGGOLAC_PRODUCTION-main-2/app/Http/Controllers/UserController.php:281)
+[stacktrace]
+#0 {main}
+"} 
+[2026-04-20 16:16:54] local.ERROR: dLocal createCheckout 4xx: {"code":3003,"message":"Merchant has no authorization to use this API."}  

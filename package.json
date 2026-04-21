@@ -1,0 +1,18 @@
+{
+    "private": true,
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "build:analyze": "vite build --mode analyze"
+    },
+    "dependencies": {
+        "axios": "^1.6.0",
+        "lodash-es": "^4.17.21"
+    },
+    "devDependencies": {
+        "laravel-vite-plugin": "^1.0.0",
+        "postcss": "^8.4.38",
+        "vite": "^5.0.0",
+        "vite-plugin-compression2": "^1.1.1"
+    }
+}
