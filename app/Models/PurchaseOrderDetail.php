@@ -37,7 +37,7 @@ class PurchaseOrderDetail extends Model
 
     public function product()
     {
-        return $this->belongsTo(Product::class, 'product_id')->select('id', 'name_product AS name', 'image_product', 'price_from', 'price_to', 'brand_id');
+        return $this->belongsTo(Product::class, 'product_id')->select('id', 'name_product AS name', 'image_product', 'price_from', 'price_to', 'brand_id', 'supplier_url', 'supplier_cost');
     }
 
     public function images()

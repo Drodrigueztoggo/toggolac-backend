@@ -637,6 +637,9 @@ class DlocalPaymentController extends Controller
 
                     //ENVÍO DE EMAIL CUANDO SE COMPLETA LA COMPRA
                     $this->sendEmailConfirm($infoTransaction->purchase_order_id, $paymentLast4, $paymentBrand);
+
+                    // ── Dispatch supplier fulfillment (fire-and-forget) ────────
+                    $this->dispatchFulfillment($infoTransaction->purchase_order_id, $paidOrderDetails);
                 }
 
                 $log = new TransactionLog();

@@ -22,6 +22,8 @@ class Product extends Model
         'brand_id',
         // 'mall_id',
         'image_product',
+        'supplier_url',
+        'supplier_cost',
     ];
 
     protected $appends = ['image'];
