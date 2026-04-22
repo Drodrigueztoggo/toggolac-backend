@@ -61,7 +61,7 @@ class Offer extends Model
 
     public function product()
     {
-        return $this->belongsTo(Product::class, 'product_id')->select('id', 'name_product AS name', 'image_product', 'brand_id', 'price_from', 'price_to');
+        return $this->belongsTo(Product::class, 'product_id')->select('id', 'name_product AS name', 'name_product_en', 'image_product', 'brand_id', 'price_from', 'price_to');
     }
 
     protected function serializeDate(DateTimeInterface $date) : string
