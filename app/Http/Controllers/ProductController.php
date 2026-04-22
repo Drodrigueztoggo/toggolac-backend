@@ -189,21 +189,21 @@ class ProductController extends Controller
                 $categoriesFormat = collect($prod['categories'])->map(function ($category) use ($translate, $TGGlanguage) {
                     return [
                         "id" => $category['id'],
-                        "name" => $TGGlanguage != 'es' ? $translate->translateText($category['name'], $TGGlanguage) : $category['name'],
+                        "name" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? $translate->translateText($category['name'], $TGGlanguage) : $category['name'],
                     ];
                 });
 
                 $storeFormat = collect($prod['storeProducts'])->map(function ($store) use ($translate, $TGGlanguage) {
                     return [
                         "id" => $store['id'],
-                        "name" => $TGGlanguage != 'es' ? $translate->translateText($store['name'], $TGGlanguage) : $store['name'],
+                        "name" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? $translate->translateText($store['name'], $TGGlanguage) : $store['name'],
                     ];
                 });
 
                 $mallFormat = collect($prod['mallProducts'])->map(function ($mall) use ($translate, $TGGlanguage) {
                     return [
                         "id" => $mall['id'],
-                        "name" => $TGGlanguage != 'es' ? $translate->translateText($mall['name'], $TGGlanguage) : $mall['name'],
+                        "name" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? $translate->translateText($mall['name'], $TGGlanguage) : $mall['name'],
                     ];
                 });
 
@@ -212,8 +212,8 @@ class ProductController extends Controller
                     "id" => $prod['id'],
                     "rating" => $rating,
                     "created_at" => $prod['created_at'],
-                    "name_product" => $TGGlanguage != 'es' ? ($prod['name_product_en'] ?? $prod['name_product']) : $prod['name_product'],
-                    "description_product" => $TGGlanguage != 'es' ? ($prod['description_product_en'] ?? $prod['description_product']) : $prod['description_product'],
+                    "name_product" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? ($prod['name_product_en'] ?? $prod['name_product']) : $prod['name_product'],
+                    "description_product" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? ($prod['description_product_en'] ?? $prod['description_product']) : $prod['description_product'],
                     // "price_from" => $prod['price_from'],
                     // "price_to" => $prod['price_to'],
 
@@ -235,8 +235,8 @@ class ProductController extends Controller
                     "categories" => $categoriesFormat,
                     "brand" => isset($prod['brand']) ? [
                         "id" => $prod['brand']['id'],
-                        "name_brand" => $TGGlanguage != 'es' ? $translate->translateText($prod['brand']['name_brand'], $TGGlanguage) : $prod['brand']['name_brand'],
-                        "description_brand" => $TGGlanguage != 'es' ? $translate->translateText($prod['brand']['description_brand'], $TGGlanguage) : $prod['brand']['description_brand'],
+                        "name_brand" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? $translate->translateText($prod['brand']['name_brand'], $TGGlanguage) : $prod['brand']['name_brand'],
+                        "description_brand" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? $translate->translateText($prod['brand']['description_brand'], $TGGlanguage) : $prod['brand']['description_brand'],
                         "image" => $prod['brand']['image'],
                     ] : null,
                     "store_products" => $storeFormat,
@@ -388,7 +388,7 @@ class ProductController extends Controller
                     ->map(function ($category) use ($TGGlanguage, $translate) {
                         return [
                             'id' => $category->id,
-                            "name" => $TGGlanguage != 'es' ? $translate->translateText($category->name, $TGGlanguage) : $category->name,
+                            "name" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? $translate->translateText($category->name, $TGGlanguage) : $category->name,
                         ];
                     });
             } else {
@@ -401,7 +401,7 @@ class ProductController extends Controller
                         return [
                             'id' => $category->id,
                             'image' => $category->image,
-                            "name" => $TGGlanguage != 'es' ? $translate->translateText($category->name, $TGGlanguage) : $category->name,
+                            "name" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? $translate->translateText($category->name, $TGGlanguage) : $category->name,
                         ];
                     });
             } else {
@@ -411,8 +411,8 @@ class ProductController extends Controller
 
             $response = [
                 "id" => $product["id"],
-                "name_product" => $TGGlanguage != 'es' ? ($product["name_product_en"] ?? $product["name_product"]) : $product["name_product"],
-                "description_product" => $TGGlanguage != 'es' ? ($product["description_product_en"] ?? $product["description_product"]) : $product["description_product"],
+                "name_product" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? ($product["name_product_en"] ?? $product["name_product"]) : $product["name_product"],
+                "description_product" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? ($product["description_product_en"] ?? $product["description_product"]) : $product["description_product"],
                 "price_from" => $currencyFunctions->convertAmount('USD', $currency, $product["price_from"] ? $product["price_from"]: 0),
                 "price_to" => $currencyFunctions->convertAmount('USD', $currency, $product["price_to"] ? $product["price_to"]: 0),
                 "weight" => $product["weight"],
@@ -462,8 +462,8 @@ class ProductController extends Controller
                 $data = [
                     "id" => $product->id,
                     "rating" => $rating,
-                    "name_product" => $TGGlanguage != 'es' ? ($product->name_product_en ?? $product->name_product) : $product->name_product,
-                    "description_product" => $TGGlanguage != 'es' ? ($product->description_product_en ?? $product->description_product) : $product->description_product,
+                    "name_product" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? ($product->name_product_en ?? $product->name_product) : $product->name_product,
+                    "description_product" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? ($product->description_product_en ?? $product->description_product) : $product->description_product,
                     "price_from" => isset($product->price_from) ? $currencyFunctions->convertAmount('USD', $currency, $product->price_from) : 0,
                     "price_to" => isset($product->price_to) ? $currencyFunctions->convertAmount('USD', $currency, $product->price_to) : 0,
                     "weight" => $product->weight,
