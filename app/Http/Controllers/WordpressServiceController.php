@@ -20,6 +20,7 @@ class WordpressServiceController extends Controller
             $currencyFunctions = new CurrencyController();
             $TGGlanguage = $request->TGGlanguage;
             $currency = $request->currency;
+            $isEn = str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en');
 
             $currentDate = now();
 
@@ -48,10 +49,10 @@ class WordpressServiceController extends Controller
             $offers = $offers->select('id', 'name', 'image_offert')
                 ->get();
 
-            $offersFormat = $offers->map(function ($item) use ($translate, $TGGlanguage) {
+            $offersFormat = $offers->map(function ($item) use ($translate, $TGGlanguage, $isEn) {
                 return [
                     "id" => $item['id'],
-                    "name" => $TGGlanguage != 'es' ? $translate->translateText($item['name'], $TGGlanguage) : $item['name'],
+                    "name" => $isEn ? $translate->translateText($item['name'], $TGGlanguage) : $item['name'],
                     "image" => $item['image']
                 ];
             });
@@ -60,7 +61,7 @@ class WordpressServiceController extends Controller
 
             $additionalOffer = $additionalOffer->get();
 
-            $additionalOfferFormat = $additionalOffer->map(function ($offert) use ($translate, $TGGlanguage, $currencyFunctions, $currency) {
+            $additionalOfferFormat = $additionalOffer->map(function ($offert) use ($translate, $TGGlanguage, $isEn, $currencyFunctions, $currency) {
 
                 if(isset($offert->product)){
                     $rating =  isset($offert->product->evaluations) && count($offert->product->evaluations) > 0 ? $offert->product->evaluations->avg('rating') : 0;
@@ -69,8 +70,8 @@ class WordpressServiceController extends Controller
 
                 return [
                     'id' => $offert->id,
-                    "name" => $TGGlanguage != 'es' ? $translate->translateText($offert->name, $TGGlanguage) : $offert->name,
-                    "description" => $TGGlanguage != 'es' ? $translate->translateText($offert->description, $TGGlanguage) : $offert->description,
+                    "name" => $isEn ? $translate->translateText($offert->name, $TGGlanguage) : $offert->name,
+                    "description" => $isEn ? $translate->translateText($offert->description, $TGGlanguage) : $offert->description,
                     'product_id' => $offert->product_id,
                     'end_date' => $offert->end_date,
                     'store_mall_id' => $offert->store_mall_id,
@@ -86,11 +87,13 @@ class WordpressServiceController extends Controller
                             'rating' => $rating,
                             'brand' => $offert->product->brand ? [
                                 "id" => $offert->product->brand->id,
-                                "name_brand" => $TGGlanguage != 'es' ? $translate->translateText($offert->product->brand->name_brand, $TGGlanguage) : $offert->product->brand->name_brand,
-                                "description_brand" => $TGGlanguage != 'es' ? $translate->translateText($offert->product->brand->description_brand, $TGGlanguage) : $offert->product->brand->description_brand,
+                                "name_brand" => $isEn ? $translate->translateText($offert->product->brand->name_brand, $TGGlanguage) : $offert->product->brand->name_brand,
+                                "description_brand" => $isEn ? $translate->translateText($offert->product->brand->description_brand, $TGGlanguage) : $offert->product->brand->description_brand,
                                 "image" => $offert->product->brand->image,
                             ] : null,
-                            "name" => $TGGlanguage != 'es' ? $translate->translateText($offert->product->name, $TGGlanguage) : $offert->product->name,
+                            "name" => $isEn
+                                ? ($offert->product->name_product_en ?? $offert->product->name_product)
+                                : $offert->product->name_product,
                             'price' => [
                                 'min' => $offert->product->price_from ?   $currencyFunctions->convertAmount('USD', $currency, $offert->product->price_from) : 0,
                                 'max' => $offert->product->price_to ?   $currencyFunctions->convertAmount('USD', $currency, $offert->product->price_to) : 0,
@@ -126,6 +129,7 @@ class WordpressServiceController extends Controller
 
             $TGGlanguage = $request->TGGlanguage;
             $currency = $request->currency;
+            $isEn = str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en');
             $translate = new GoogleTranslateController();
             $currencyFunctions = new CurrencyController();
 
@@ -175,8 +179,8 @@ class WordpressServiceController extends Controller
                 $productsQuery->limit($filter_limit);
             }
             
-            $productsQuery->select('id', 'name_product AS name', 'price_from', 'price_to', 'image_product', 'brand_id', 'description_product');
-            
+            $productsQuery->select('id', 'name_product AS name', 'name_product_en', 'price_from', 'price_to', 'image_product', 'brand_id', 'description_product', 'description_product_en');
+
             if(isset($filter_order) && $filter_order == 'rand'){
                 $products = $productsQuery->inRandomOrder()->get();
             }else{
@@ -188,7 +192,7 @@ class WordpressServiceController extends Controller
 
 
                 // Reorganizar la estructura JSON
-                $formattedProducts = $products->map(function ($product) use ($TGGlanguage, $translate, $currencyFunctions, $currency) {
+                $formattedProducts = $products->map(function ($product) use ($TGGlanguage, $isEn, $translate, $currencyFunctions, $currency) {
 
                     $rating =  isset($product->evaluations) && count($product->evaluations) > 0 ? $product->evaluations->avg('rating') : 0;
 
@@ -208,10 +212,10 @@ class WordpressServiceController extends Controller
 
                     if (isset($product->mallProducts)) {
                         $malls = collect($product->mallProducts)
-                            ->map(function ($mall) use ($TGGlanguage, $translate) {
+                            ->map(function ($mall) use ($TGGlanguage, $isEn, $translate) {
                                 return [
                                     'id' => $mall->id,
-                                    "name" => $TGGlanguage != 'es' ? $translate->translateText($mall->name, $TGGlanguage) : $mall->name,
+                                    "name" => $isEn ? $translate->translateText($mall->name, $TGGlanguage) : $mall->name,
                                     'image' => $mall->image,
                                 ];
                             });
@@ -219,10 +223,10 @@ class WordpressServiceController extends Controller
 
                     if (isset($product->storeProducts)) {
                         $stores = collect($product->storeProducts)
-                            ->map(function ($mall) use ($TGGlanguage, $translate) {
+                            ->map(function ($mall) use ($TGGlanguage, $isEn, $translate) {
                                 return [
                                     'id' => $mall->id,
-                                    "name" => $TGGlanguage != 'es' ? $translate->translateText($mall->name, $TGGlanguage) : $mall->name,
+                                    "name" => $isEn ? $translate->translateText($mall->name, $TGGlanguage) : $mall->name,
                                     'image' => $mall->image,
                                 ];
                             });
@@ -230,12 +234,11 @@ class WordpressServiceController extends Controller
 
                     if (isset($product->categoriesProduct)) {
 
-
                         $categories = collect($product->categoriesProduct)
-                            ->map(function ($category) use ($TGGlanguage, $translate) {
+                            ->map(function ($category) use ($TGGlanguage, $isEn, $translate) {
                                 return [
                                     'id' => $category->category_id,
-                                    "name" => $TGGlanguage != 'es' ? $translate->translateText($category->category->name_category, $TGGlanguage) : $category->category->name_category,
+                                    "name" => $isEn ? $translate->translateText($category->category->name_category, $TGGlanguage) : $category->category->name_category,
                                     'image' => $category->category->image,
                                 ];
                             });
@@ -248,21 +251,19 @@ class WordpressServiceController extends Controller
                         'rating' => $rating,
                         'brand' => isset($product->brand) ? [
                             "id" => $product->brand->id,
-                            "name_brand" => $TGGlanguage != 'es' ? $translate->translateText($product->brand->name_brand, $TGGlanguage) : $product->brand->name_brand,
+                            "name_brand" => $isEn ? $translate->translateText($product->brand->name_brand, $TGGlanguage) : $product->brand->name_brand,
                             "image" => $product->brand->image
                         ] : null,
                         'malls' => $malls,
                         'stores' => $stores,
                         'countries' => $uniqueCountries,
-                        "name" => $TGGlanguage != 'es' ? $translate->translateText($product->name, $TGGlanguage) : $product->name,
-                        "description_product" => $TGGlanguage != 'es' ? $translate->translateText($product->description_product, $TGGlanguage) : $product->description_product,
+                        "name" => $isEn ? ($product->name_product_en ?? $product->name) : $product->name,
+                        "description_product" => $isEn ? ($product->description_product_en ?? $product->description_product) : $product->description_product,
                         'price' => [
-                            // 'min' => $product->price_from ?  MoneyConvert::USD($product->price_from) : 0,
                             'min' => $product->price_from ?  $currencyFunctions->convertAmount('USD', $currency, $product->price_from) : 0,
                             'max' => $product->price_to ? $currencyFunctions->convertAmount('USD', $currency, $product->price_to) : 0
                         ],
                         "price_origin" => $product->price_from,
-                        // 'image_product' => $product->image,
                         'image' => asset($product->image)
                     ];
                 });
@@ -276,12 +277,14 @@ class WordpressServiceController extends Controller
             return response()->json(['error' => 'Ocurrió un error en el servidor.'], 500);
         }
     }
+
     public function getLastProductsPaginate(Request $request)
     {
         try {
 
             $TGGlanguage = $request->TGGlanguage;
             $currency = $request->currency;
+            $isEn = str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en');
             $translate = new GoogleTranslateController();
             $currencyFunctions = new CurrencyController();
 
@@ -332,8 +335,7 @@ class WordpressServiceController extends Controller
                 $productsQuery->limit($filter_limit);
             }
 
-            $productsQuery->select('id', 'name_product AS name', 'price_from', 'price_to', 'image_product', 'brand_id', 'description_product');
-
+            $productsQuery->select('id', 'name_product AS name', 'name_product_en', 'price_from', 'price_to', 'image_product', 'brand_id', 'description_product', 'description_product_en');
 
             if(isset($filter_order) && $filter_order == 'rand'){
                 $products = $productsQuery->inRandomOrder()->paginate($per_page);
@@ -350,7 +352,7 @@ class WordpressServiceController extends Controller
 
 
                 // Reorganizar la estructura JSON
-                $formattedProducts = $products->map(function ($product) use ($TGGlanguage, $translate, $currencyFunctions, $currency) {
+                $formattedProducts = $products->map(function ($product) use ($TGGlanguage, $isEn, $translate, $currencyFunctions, $currency) {
 
                     $rating =  isset($product->evaluations) && count($product->evaluations) > 0 ? $product->evaluations->avg('rating') : 0;
 
@@ -370,10 +372,10 @@ class WordpressServiceController extends Controller
 
                     if (isset($product->mallProducts)) {
                         $malls = collect($product->mallProducts)
-                            ->map(function ($mall) use ($TGGlanguage, $translate) {
+                            ->map(function ($mall) use ($TGGlanguage, $isEn, $translate) {
                                 return [
                                     'id' => $mall->id,
-                                    "name" => $TGGlanguage != 'es' ? $translate->translateText($mall->name, $TGGlanguage) : $mall->name,
+                                    "name" => $isEn ? $translate->translateText($mall->name, $TGGlanguage) : $mall->name,
                                     'image' => $mall->image,
                                 ];
                             });
@@ -381,10 +383,10 @@ class WordpressServiceController extends Controller
 
                     if (isset($product->storeProducts)) {
                         $stores = collect($product->storeProducts)
-                            ->map(function ($mall) use ($TGGlanguage, $translate) {
+                            ->map(function ($mall) use ($TGGlanguage, $isEn, $translate) {
                                 return [
                                     'id' => $mall->id,
-                                    "name" => $TGGlanguage != 'es' ? $translate->translateText($mall->name, $TGGlanguage) : $mall->name,
+                                    "name" => $isEn ? $translate->translateText($mall->name, $TGGlanguage) : $mall->name,
                                     'image' => $mall->image,
                                 ];
                             });
@@ -392,12 +394,11 @@ class WordpressServiceController extends Controller
 
                     if (isset($product->categoriesProduct)) {
 
-
                         $categories = collect($product->categoriesProduct)
-                            ->map(function ($category) use ($TGGlanguage, $translate) {
+                            ->map(function ($category) use ($TGGlanguage, $isEn, $translate) {
                                 return [
                                     'id' => $category->category_id,
-                                    "name" => $TGGlanguage != 'es' ? $translate->translateText($category->category->name_category, $TGGlanguage) : $category->category->name_category,
+                                    "name" => $isEn ? $translate->translateText($category->category->name_category, $TGGlanguage) : $category->category->name_category,
                                     'image' => $category->category->image,
                                 ];
                             });
@@ -410,21 +411,19 @@ class WordpressServiceController extends Controller
                         'rating' => $rating,
                         'brand' => isset($product->brand) ? [
                             "id" => $product->brand->id,
-                            "name_brand" => $TGGlanguage != 'es' ? $translate->translateText($product->brand->name_brand, $TGGlanguage) : $product->brand->name_brand,
+                            "name_brand" => $isEn ? $translate->translateText($product->brand->name_brand, $TGGlanguage) : $product->brand->name_brand,
                             "image" => $product->brand->image
                         ] : null,
                         'malls' => $malls,
                         'stores' => $stores,
                         'countries' => $uniqueCountries,
-                        "name" => $TGGlanguage != 'es' ? $translate->translateText($product->name, $TGGlanguage) : $product->name,
-                        "description_product" => $TGGlanguage != 'es' ? $translate->translateText($product->description_product, $TGGlanguage) : $product->description_product,
+                        "name" => $isEn ? ($product->name_product_en ?? $product->name) : $product->name,
+                        "description_product" => $isEn ? ($product->description_product_en ?? $product->description_product) : $product->description_product,
                         'price' => [
-                            // 'min' => $product->price_from ?  MoneyConvert::USD($product->price_from) : 0,
                             'min' => $product->price_from ?  $currencyFunctions->convertAmount('USD', $currency, $product->price_from) : 0,
                             'max' => $product->price_to ? $currencyFunctions->convertAmount('USD', $currency, $product->price_to) : 0
                         ],
                         "price_origin" => $product->price_from,
-                        // 'image_product' => $product->image,
                         'image' => asset($product->image)
                     ];
                 });
@@ -462,16 +461,17 @@ class WordpressServiceController extends Controller
     {
         try {
             $TGGlanguage = $request->TGGlanguage;
+            $isEn = str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en');
             $translate = new GoogleTranslateController();
 
             // Obtener todas las categorías
             $categories = Category::select('id', 'name_category AS name', 'image_category', 'description_category')->get();
 
-            $categoryFormat = $categories->map(function ($item) use ($translate, $TGGlanguage) {
+            $categoryFormat = $categories->map(function ($item) use ($translate, $TGGlanguage, $isEn) {
                 return [
                     "id" => $item['id'],
-                    "name" => $TGGlanguage != 'es' ? $translate->translateText($item['name'], $TGGlanguage) : $item['name'],
-                    "description" => $TGGlanguage != 'es' ? $translate->translateText($item['description_category'], $TGGlanguage) : $item['description_category'],
+                    "name" => $isEn ? $translate->translateText($item['name'], $TGGlanguage) : $item['name'],
+                    "description" => $isEn ? $translate->translateText($item['description_category'], $TGGlanguage) : $item['description_category'],
                     "image" => $item['image']
                 ];
             });
