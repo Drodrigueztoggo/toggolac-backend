@@ -59,7 +59,7 @@ class NotificationController extends Controller
             foreach ($query as $device) {
                 $fcmToken = $device->device_token; // Obtén el token de Firebase guardado en la base de datos
                 // Create a Firebase factory
-                $archivo = base_path('firebase.json');
+                $archivo = env('FIREBASE_CREDENTIALS_PATH', storage_path('app/firebase.json'));
                 $factory = (new Factory)
                 ->withServiceAccount($archivo);
                 // Create a Firebase Messaging instance
