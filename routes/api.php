@@ -280,6 +280,13 @@ Route::group(['prefix' => 'shipping'], function () {
     });
 });
 
+Route::group(['prefix' => 'seo'], function () {
+    Route::controller(\App\Http\Controllers\SeoController::class)->group(function () {
+        Route::get('ping',       'pingIndexNow');
+        Route::post('ping-batch', 'pingIndexNowBatch');
+    });
+});
+
 Route::group(['prefix' => 'wp_service'], function () {
     Route::controller(WordpressServiceController::class)->group(function () {
         Route::get('get_offers', 'getWordPressData')->middleware('cache.headers:public;max_age=300;etag');
