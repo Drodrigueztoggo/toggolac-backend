@@ -29,7 +29,9 @@ class AddProductRequest extends FormRequest
         return [
             // 'name_product' => 'required|string',
             'name_product' => 'required|string|unique:products,name_product,NULL,id,deleted_at,NULL',
-            'description_product' => 'nullable|string',
+            'description_product'    => 'nullable|string',
+            'name_product_en'        => 'nullable|string|max:255',
+            'description_product_en' => 'nullable|string',
             'price_from' => 'required|numeric|regex:/^\d+(\.\d{1,2})?$/',
             'price_to' => 'nullable|numeric|regex:/^\d+(\.\d{1,2})?$/',
             'weight' => 'nullable|numeric|regex:/^\d+(\.\d{1,2})?$/',

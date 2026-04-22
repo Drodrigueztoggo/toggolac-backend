@@ -37,7 +37,9 @@ class UpdateProductRequest extends FormRequest
                 'max:255',
                 Rule::unique('products', 'name_product')->ignore($id, 'id')->whereNull('deleted_at')
             ],
-            'description_product' => 'nullable|string',
+            'description_product'    => 'nullable|string',
+            'name_product_en'        => 'nullable|string|max:255',
+            'description_product_en' => 'nullable|string',
             'price_from' => 'required|numeric|regex:/^\d+(\.\d{1,2})?$/',
             'price_to' => 'required|numeric|regex:/^\d+(\.\d{1,2})?$/',
             'weight' => 'required|numeric|regex:/^\d+(\.\d{1,2})?$/',

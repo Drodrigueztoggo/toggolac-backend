@@ -212,8 +212,8 @@ class ProductController extends Controller
                     "id" => $prod['id'],
                     "rating" => $rating,
                     "created_at" => $prod['created_at'],
-                    "name_product" => $TGGlanguage != 'es' ? $translate->translateText($prod['name_product'], $TGGlanguage) : $prod['name_product'],
-                    "description_product" => $TGGlanguage != 'es' ? $translate->translateText($prod['description_product'], $TGGlanguage) : $prod['description_product'],
+                    "name_product" => $TGGlanguage != 'es' ? ($prod['name_product_en'] ?? $prod['name_product']) : $prod['name_product'],
+                    "description_product" => $TGGlanguage != 'es' ? ($prod['description_product_en'] ?? $prod['description_product']) : $prod['description_product'],
                     // "price_from" => $prod['price_from'],
                     // "price_to" => $prod['price_to'],
 
@@ -411,8 +411,8 @@ class ProductController extends Controller
 
             $response = [
                 "id" => $product["id"],
-                "name_product" => $TGGlanguage != 'es' ? $translate->translateText($product["name_product"], $TGGlanguage) : $product["name_product"],
-                "description_product" => $TGGlanguage != 'es' ? $translate->translateText($product["description_product"], $TGGlanguage) : $product["description_product"],
+                "name_product" => $TGGlanguage != 'es' ? ($product["name_product_en"] ?? $product["name_product"]) : $product["name_product"],
+                "description_product" => $TGGlanguage != 'es' ? ($product["description_product_en"] ?? $product["description_product"]) : $product["description_product"],
                 "price_from" => $currencyFunctions->convertAmount('USD', $currency, $product["price_from"] ? $product["price_from"]: 0),
                 "price_to" => $currencyFunctions->convertAmount('USD', $currency, $product["price_to"] ? $product["price_to"]: 0),
                 "weight" => $product["weight"],
@@ -462,8 +462,8 @@ class ProductController extends Controller
                 $data = [
                     "id" => $product->id,
                     "rating" => $rating,
-                    "name_product" => $TGGlanguage != 'es' ? $translate->translateText($product->name_product, $TGGlanguage) : $product->name_product,
-                    "description_product" => $TGGlanguage != 'es' ? $translate->translateText($product->description_product, $TGGlanguage) : $product->description_product,
+                    "name_product" => $TGGlanguage != 'es' ? ($product->name_product_en ?? $product->name_product) : $product->name_product,
+                    "description_product" => $TGGlanguage != 'es' ? ($product->description_product_en ?? $product->description_product) : $product->description_product,
                     "price_from" => isset($product->price_from) ? $currencyFunctions->convertAmount('USD', $currency, $product->price_from) : 0,
                     "price_to" => isset($product->price_to) ? $currencyFunctions->convertAmount('USD', $currency, $product->price_to) : 0,
                     "weight" => $product->weight,
