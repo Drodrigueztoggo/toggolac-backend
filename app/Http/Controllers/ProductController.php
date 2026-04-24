@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Exception;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use Cknow\Money\Money as MoneyConvert;
@@ -433,6 +434,8 @@ class ProductController extends Controller
 
 
             return response()->json($response);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['status' => 'error', 'message' => 'Product not found'], 404);
         } catch (Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -479,6 +482,8 @@ class ProductController extends Controller
             }
 
             return response()->json($data);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['status' => 'error', 'message' => 'Product not found'], 404);
         } catch (Exception $e) {
             return response()->json([
                 'status' => 'error',
