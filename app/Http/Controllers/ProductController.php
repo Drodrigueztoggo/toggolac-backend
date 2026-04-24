@@ -366,6 +366,20 @@ class ProductController extends Controller
         }
     }
 
+    public function getSupplierCatalog(Request $request)
+    {
+        try {
+            $supplier = $request->query('supplier', '888lots');
+            $products = Product::whereNull('deleted_at')
+                ->where('supplier_url', 'LIKE', "%{$supplier}%")
+                ->select('id', 'name_product', 'supplier_url', 'supplier_cost', 'price_from', 'price_to', 'weight')
+                ->get();
+            return response()->json($products);
+        } catch (Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
     public function showProduct(Request $request)
     {
         try {

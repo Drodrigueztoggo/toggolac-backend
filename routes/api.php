@@ -171,6 +171,7 @@ Route::group(['prefix' => 'products'], function () {
         Route::get('get_list', 'getProductsList');
         Route::get('get_list_public', 'getProductsListPublic')->middleware('cache.headers:public;max_age=300;etag');
         Route::get('product-detail/{id}', 'showProductPublic')->middleware('cache.headers:public;max_age=300;etag');
+        Route::get('supplier-catalog', 'getSupplierCatalog');
         Route::middleware(['checkAuth'])->group(function () {
             Route::get('get', 'getProducts');
             Route::post('add', 'addProduct');
