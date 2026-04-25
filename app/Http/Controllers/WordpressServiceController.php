@@ -24,98 +24,101 @@ class WordpressServiceController extends Controller
 
             $currentDate = now();
 
-            $additionalOffer = Offer::with('product.brand', 'product.evaluations', 'storeMall')
+            // Fetch all active offers with their product categories
+            $activeOffers = Offer::with([
+                'product.brand',
+                'product.evaluations',
+                'product.categoriesProduct.category',
+                'storeMall',
+            ])
                 ->whereNull('deleted_at')
                 ->whereNotNull('product_id')
                 ->where('start_date', '<=', $currentDate)
                 ->where('end_date', '>=', $currentDate)
-                // ->whereNotIn('id', $offers->pluck('id')->toArray()) // PARA NO MOSTRAR LAS OFERTAS ANTERIORES
                 ->inRandomOrder()
-                ->select('id', 'image_offert', 'name', 'description', 'product_id', 'end_date', 'discount_price_from', 'discount_price_to', 'discount_percentage_from', 'discount_percentage_to', 'store_mall_id')
-                ->limit(6);
-
-
-
-
-            // Obtener 4 ofertas aleatorias
-            $offers = Offer::where('start_date', '<=', $currentDate)
-                ->where('end_date', '>=', $currentDate)
-                ->inRandomOrder()
-                ->limit(4);
-            if (isset($additionalOffer)) {
-                // $offers->whereNotIn('id', $additionalOffer->pluck("id"));
-            }
-
-            $offers = $offers->select('id', 'name', 'image_offert')
+                ->select('id', 'image_offert', 'name', 'description', 'product_id', 'end_date',
+                         'discount_price_from', 'discount_price_to',
+                         'discount_percentage_from', 'discount_percentage_to', 'store_mall_id')
                 ->get();
 
-            $offersFormat = $offers->map(function ($item) use ($translate, $TGGlanguage, $isEn) {
-                return [
-                    "id" => $item['id'],
-                    "name" => $isEn ? $translate->translateText($item['name'], $TGGlanguage) : $item['name'],
-                    "image" => $item['image']
-                ];
-            });
+            // Group offers by primary category (up to 6 per category)
+            $grouped = [];
+            foreach ($activeOffers as $offer) {
+                if (!$offer->product) continue;
 
-
-
-            $additionalOffer = $additionalOffer->get();
-
-            $additionalOfferFormat = $additionalOffer->map(function ($offert) use ($translate, $TGGlanguage, $isEn, $currencyFunctions, $currency) {
-
-                if(isset($offert->product)){
-                    $rating =  isset($offert->product->evaluations) && count($offert->product->evaluations) > 0 ? $offert->product->evaluations->avg('rating') : 0;
+                $cats = $offer->product->categoriesProduct;
+                if ($cats && $cats->isNotEmpty() && $cats->first()->category) {
+                    $cat    = $cats->first()->category;
+                    $catId  = $cat->id;
+                    $catName = $cat->name_category;
+                } else {
+                    $catId   = 45;
+                    $catName = 'Tecnología';
                 }
 
+                if (!isset($grouped[$catId])) {
+                    $grouped[$catId] = ['id' => $catId, 'name' => $catName, 'items' => []];
+                }
+                if (count($grouped[$catId]['items']) < 6) {
+                    $grouped[$catId]['items'][] = $offer;
+                }
+            }
 
+            // Format helper (reused per offer)
+            $formatOffer = function ($offert) use ($translate, $TGGlanguage, $isEn, $currencyFunctions, $currency) {
+                $rating = 0;
+                if (isset($offert->product)) {
+                    $rating = isset($offert->product->evaluations) && count($offert->product->evaluations) > 0
+                        ? $offert->product->evaluations->avg('rating') : 0;
+                }
                 return [
-                    'id' => $offert->id,
-                    "name" => $isEn ? $translate->translateText($offert->name, $TGGlanguage) : $offert->name,
-                    "description" => $isEn ? $translate->translateText($offert->description, $TGGlanguage) : $offert->description,
-                    'product_id' => $offert->product_id,
-                    'end_date' => $offert->end_date,
+                    'id'          => $offert->id,
+                    'name'        => $isEn ? $translate->translateText($offert->name, $TGGlanguage) : $offert->name,
+                    'description' => $isEn ? $translate->translateText($offert->description, $TGGlanguage) : $offert->description,
+                    'product_id'  => $offert->product_id,
+                    'end_date'    => $offert->end_date,
                     'store_mall_id' => $offert->store_mall_id,
                     'price' => [
-                        'min' => $offert->discount_price_from ?  $currencyFunctions->convertAmount('USD', $currency, $offert->discount_price_from) : 0,
-                        'max' => $offert->discount_price_to ?  $currencyFunctions->convertAmount('USD', $currency, $offert->discount_price_to) : 0,
+                        'min' => $offert->discount_price_from ? $currencyFunctions->convertAmount('USD', $currency, $offert->discount_price_from) : 0,
+                        'max' => $offert->discount_price_to   ? $currencyFunctions->convertAmount('USD', $currency, $offert->discount_price_to)   : 0,
                     ],
-                    'percentage' => (isset($offert->discount_percentage_from) && isset($offert->discount_percentage_to)) ? $offert->discount_percentage_from . "% - " . $offert->discount_percentage_to . "%" : $offert->discount_percentage_from . "%",
-                    'image' => asset($offert->image),
-                    'product' => $offert->product ?
-                        [
-                            'id' => $offert->product->id,
-                            'rating' => $rating,
-                            'brand' => $offert->product->brand ? [
-                                "id" => $offert->product->brand->id,
-                                "name_brand" => $isEn ? $translate->translateText($offert->product->brand->name_brand, $TGGlanguage) : $offert->product->brand->name_brand,
-                                "description_brand" => $isEn ? $translate->translateText($offert->product->brand->description_brand, $TGGlanguage) : $offert->product->brand->description_brand,
-                                "image" => $offert->product->brand->image,
-                            ] : null,
-                            "name" => $isEn
-                                ? ($offert->product->name_product_en ?? $offert->product->name_product)
-                                : $offert->product->name_product,
-                            'price' => [
-                                'min' => $offert->product->price_from ?   $currencyFunctions->convertAmount('USD', $currency, $offert->product->price_from) : 0,
-                                'max' => $offert->product->price_to ?   $currencyFunctions->convertAmount('USD', $currency, $offert->product->price_to) : 0,
-                            ],
-                            'image_product' => $offert->product->image,
-                            'image' => asset($offert->product->image),
-                        ]
-                        : null,
+                    'percentage' => isset($offert->discount_percentage_to)
+                        ? $offert->discount_percentage_from . '% - ' . $offert->discount_percentage_to . '%'
+                        : $offert->discount_percentage_from . '%',
+                    'image'   => asset($offert->image),
+                    'product' => $offert->product ? [
+                        'id'     => $offert->product->id,
+                        'rating' => $rating,
+                        'brand'  => $offert->product->brand ? [
+                            'id'          => $offert->product->brand->id,
+                            'name_brand'  => $isEn ? $translate->translateText($offert->product->brand->name_brand, $TGGlanguage) : $offert->product->brand->name_brand,
+                            'image'       => $offert->product->brand->image,
+                        ] : null,
+                        'name'  => $isEn
+                            ? ($offert->product->name_product_en ?? $offert->product->name_product)
+                            : $offert->product->name_product,
+                        'price' => [
+                            'min' => $offert->product->price_from ? $currencyFunctions->convertAmount('USD', $currency, $offert->product->price_from) : 0,
+                            'max' => $offert->product->price_to   ? $currencyFunctions->convertAmount('USD', $currency, $offert->product->price_to)   : 0,
+                        ],
+                        'image_product' => $offert->product->image,
+                        'image'         => asset($offert->product->image),
+                    ] : null,
                     'store_mall' => $offert->storeMall,
                 ];
-            });
+            };
 
+            // Build categoryOffers array (only categories with ≥1 offer)
+            $categoryOffers = collect(array_values($grouped))
+                ->map(fn($group) => [
+                    'id'     => $group['id'],
+                    'name'   => $group['name'],
+                    'offers' => collect($group['items'])->map($formatOffer)->values(),
+                ])
+                ->filter(fn($g) => count($g['offers']) > 0)
+                ->values();
 
-
-
-            // Combinar los resultados en un solo array
-            $data = [
-                'offers' => $offersFormat,
-                'additionalOffer' => $additionalOfferFormat,
-            ];
-
-            return response()->json($data);
+            return response()->json(['categoryOffers' => $categoryOffers]);
         } catch (\Exception $e) {
             dd($e);
             // Manejar cualquier excepción y devolver una respuesta de error
