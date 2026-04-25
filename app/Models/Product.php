@@ -101,16 +101,22 @@ class Product extends Model
 
 
 
-    public function toSearchableArray()
+    public function shouldBeSearchable(): bool
     {
-        $array = $this->toArray();
+        return !empty($this->image_product) && is_null($this->deleted_at);
+    }
 
-        // Personaliza los datos a indexar
+    public function toSearchableArray(): array
+    {
         return [
-            'name_product' => $array['name_product'],
-            'description_product' => $array['description_product'],
-            'category' => $this->categoriesRelation->pluck('name_category')->toArray(),
-            "image" => $this->image
+            'id'                  => $this->id,
+            'name_product'        => $this->name_product,
+            'name_product_en'     => $this->name_product_en,
+            'description_product' => $this->description_product,
+            'price_from'          => (float) $this->price_from,
+            'price_to'            => (float) $this->price_to,
+            'category'            => $this->categoriesRelation->pluck('name_category')->toArray(),
+            'image'               => $this->image,
         ];
     }
 
