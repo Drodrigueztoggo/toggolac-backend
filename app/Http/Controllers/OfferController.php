@@ -34,22 +34,25 @@ class OfferController extends Controller
             $products = array();
             $currentDate = now();
 
-            $offers = Offer::whereNull('deleted_at')
+            $offers = Offer::with(
+                    'product.evaluations',
+                    'product.categories',
+                    'product.brand',
+                    'product.mallProducts.countryInfo',
+                    'brand',
+                    'storeMall',
+                    'mall'
+                )
+                ->whereNull('deleted_at')
                 ->whereNotNull('product_id')
                 ->where('start_date', '<=', $currentDate)
                 ->where('end_date', '>=', $currentDate)
                 ->get();
 
             foreach ($offers as $key => $offer) {
-                $product = Product::where('id', $offer->product_id)->with(
-                    'evaluations',
-                    'categories',
-                    'brand',
-                    'mallProducts.countryInfo'
-                )->first();
+                $product = $offer->product;
                 if (!is_null($product)) {
-
-                    $rating =  isset($product->evaluations) && count($product->evaluations) > 0 ? $product->evaluations->avg('rating') : 0;
+                    $rating = isset($product->evaluations) && count($product->evaluations) > 0 ? $product->evaluations->avg('rating') : 0;
 
                     $product['offert_id'] = $offer->id;
                     $product['rating'] = $rating;
@@ -57,45 +60,40 @@ class OfferController extends Controller
                     $product['off_discount_percentage_to'] = $offer->discount_percentage_to;
                     $product['off_discount_price_from'] = $offer->discount_price_from;
                     $product['off_discount_price_to'] = $offer->discount_price_to;
-                    $product['image_offert'] = isset($offer->image_offert) ? url('storage/' . $offer->image_offert) :
-                        null;
+                    $product['image_offert'] = isset($offer->image_offert) ? url('storage/' . $offer->image_offert) : null;
                     array_push($products, $product);
                 }
 
-
-                $brand = Brand::where('id', $offer->brand_id)->first();
+                $brand = $offer->brand;
                 if (!is_null($brand)) {
                     $brand['id'] = $offer->id;
                     $brand['off_discount_percentage_from'] = $offer->discount_percentage_from;
                     $brand['off_discount_percentage_to'] = $offer->discount_percentage_to;
                     $brand['off_discount_price_from'] = $offer->discount_price_from;
                     $brand['off_discount_price_to'] = $offer->discount_price_to;
-                    $brand['image_offert'] = isset($offer->image_offert) ? url('storage/' . $offer->image_offert) :
-                        null;
+                    $brand['image_offert'] = isset($offer->image_offert) ? url('storage/' . $offer->image_offert) : null;
                     array_push($brands, $brand);
                 }
 
-                $store = StoreMall::where('id', $offer->store_mall_id)->first();
+                $store = $offer->storeMall;
                 if (!is_null($store)) {
                     $store['id'] = $offer->id;
                     $store['off_discount_percentage_from'] = $offer->discount_percentage_from;
                     $store['off_discount_percentage_to'] = $offer->discount_percentage_to;
                     $store['off_discount_price_from'] = $offer->discount_price_from;
                     $store['off_discount_price_to'] = $offer->discount_price_to;
-                    $store['image_offert'] = isset($offer->image_offert) ? url('storage/' . $offer->image_offert) :
-                        null;
+                    $store['image_offert'] = isset($offer->image_offert) ? url('storage/' . $offer->image_offert) : null;
                     array_push($stores, $store);
                 }
 
-                $mall = Mall::where('id', $offer->mall_id)->first();
+                $mall = $offer->mall;
                 if (!is_null($mall)) {
                     $mall['id'] = $offer->id;
                     $mall['off_discount_percentage_from'] = $offer->discount_percentage_from;
                     $mall['off_discount_percentage_to'] = $offer->discount_percentage_to;
                     $mall['off_discount_price_from'] = $offer->discount_price_from;
                     $mall['off_discount_price_to'] = $offer->discount_price_to;
-                    $mall['image_offert'] = isset($offer->image_offert) ? url('storage/' . $offer->image_offert) :
-                        null;
+                    $mall['image_offert'] = isset($offer->image_offert) ? url('storage/' . $offer->image_offert) : null;
                     array_push($malls, $mall);
                 }
             }
