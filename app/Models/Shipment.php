@@ -29,9 +29,14 @@ class Shipment extends Model
         'origin_postal_code',
         'destination_postal_code',
         'pounds_weight',
+        'package_length',
+        'package_width',
+        'package_height',
         'total_shipping_cost',
         'current_cost',
         'create_user_id',
+        'shippo_transaction_id',
+        'label_url',
     ];
 
     public function orderDetail()

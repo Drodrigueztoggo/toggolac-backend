@@ -277,7 +277,10 @@ Route::group(['prefix' => 'shipping'], function () {
             Route::post('show', 'showInfoShipment');
             Route::post('add_shipment', 'addShipment');
             Route::post('update_shipment', 'updateShipment');
+            Route::post('{id}/generate-label', 'generateLabel');
         });
+        // Label download — no auth so it can be opened directly in browser/printer
+        Route::get('{id}/download-label', 'downloadLabel');
     });
 });
 

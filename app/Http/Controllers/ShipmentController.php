@@ -14,8 +14,11 @@ use App\Models\ReceptionCenter;
 use App\Models\Shipment;
 use App\Models\ShipmentLogStatus;
 use Carbon\Carbon;
+use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Cknow\Money\Money as MoneyConvert;
 use Exception;
 use Illuminate\Support\Facades\Mail;
@@ -599,9 +602,199 @@ class ShipmentController extends Controller
 
             return response()->json(['message' => 'Envío actualizado exitosamente'], 200);
         } catch (\Exception $e) {
-            DB::rollBack(); // Revertir la transacción en caso de error
-            // Maneja la excepción y retorna una respuesta JSON de error
+            DB::rollBack();
             return response()->json(['error' => 'Error al actualizar el envío: ' . $e->getMessage()], 500);
         }
+    }
+
+    // ── Label generation ──────────────────────────────────────────────────────
+
+    /**
+     * Generate a 4×6 shipping label.
+     * - US destination  → Shippo API (PDF_4X6, cheapest rate)
+     * - Colombia or other → DomPDF custom 4×6 label stored in /storage
+     *
+     * Optional request body: package_length, package_width, package_height (inches)
+     */
+    public function generateLabel(Request $request, int $id)
+    {
+        try {
+            $shipment = Shipment::with('destinationCountry', 'destinationState', 'destinationCity')->findOrFail($id);
+
+            // Persist optional package dimensions
+            foreach (['package_length', 'package_width', 'package_height'] as $field) {
+                if ($request->filled($field)) {
+                    $shipment->$field = (float) $request->input($field);
+                }
+            }
+            $shipment->save();
+
+            $countryName = strtolower($shipment->destinationCountry->name ?? '');
+            $isUS = str_contains($countryName, 'united states') || str_contains($countryName, 'estados unidos') || $countryName === 'us' || $countryName === 'usa';
+
+            if ($isUS) {
+                $result = $this->generateShippoLabel($shipment);
+            } else {
+                $result = $this->generateColombiaLabel($shipment);
+            }
+
+            return response()->json($result);
+
+        } catch (\Exception $e) {
+            Log::error("generateLabel failed for shipment {$id}: " . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /** Stream the stored label PDF to the browser (inline, for printing). */
+    public function downloadLabel(int $id)
+    {
+        try {
+            $shipment = Shipment::with('destinationCountry', 'destinationState', 'destinationCity')->findOrFail($id);
+
+            // If no label yet, generate on the fly
+            if (!$shipment->label_url) {
+                $countryName = strtolower($shipment->destinationCountry->name ?? '');
+                $isUS = str_contains($countryName, 'united states') || str_contains($countryName, 'estados unidos');
+                $result = $isUS ? $this->generateShippoLabel($shipment) : $this->generateColombiaLabel($shipment);
+                $shipment->refresh();
+            }
+
+            // US labels: redirect to Shippo-hosted PDF
+            if ($shipment->shippo_transaction_id && $shipment->label_url) {
+                return redirect($shipment->label_url);
+            }
+
+            // Colombia labels: stream from local storage
+            $path = 'labels/shipment-' . $id . '.pdf';
+            if (!Storage::disk('local')->exists($path)) {
+                $this->generateColombiaLabel($shipment);
+            }
+
+            return response()->streamDownload(function () use ($path) {
+                echo Storage::disk('local')->get($path);
+            }, 'label-shipment-' . $id . '.pdf', [
+                'Content-Type'        => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="label-shipment-' . $id . '.pdf"',
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    private function generateShippoLabel(Shipment $shipment): array
+    {
+        $token  = config('services.shippo.token');
+        $client = new Client(['base_uri' => 'https://api.goshippo.com/', 'timeout' => 30]);
+        $headers = ['Authorization' => 'ShippoToken ' . $token, 'Content-Type' => 'application/json'];
+
+        // Build addresses
+        $addressFrom = [
+            'name'    => config('services.shippo.origin_name', 'Toggolac'),
+            'street1' => config('services.shippo.origin_street', '7819 NW 104th Ave Apt 6'),
+            'city'    => config('services.shippo.origin_city', 'Doral'),
+            'state'   => config('services.shippo.origin_state', 'FL'),
+            'zip'     => config('services.shippo.origin_zip', '33178'),
+            'country' => 'US',
+        ];
+
+        $addressTo = [
+            'name'    => $shipment->customer_name_lastname,
+            'street1' => $shipment->destination_address,
+            'city'    => $shipment->destinationCity->name   ?? '',
+            'state'   => $shipment->destinationState->name  ?? '',
+            'zip'     => $shipment->destination_postal_code ?? '',
+            'country' => 'US',
+        ];
+
+        $parcel = [
+            'length'        => $shipment->package_length  ?? 12,
+            'width'         => $shipment->package_width   ?? 10,
+            'height'        => $shipment->package_height  ?? 6,
+            'distance_unit' => 'in',
+            'weight'        => $shipment->pounds_weight   ?? 1,
+            'mass_unit'     => 'lb',
+        ];
+
+        // Create shipment and get rates
+        $shipRes  = $client->post('shipments/', ['headers' => $headers, 'json' => [
+            'address_from' => $addressFrom,
+            'address_to'   => $addressTo,
+            'parcels'      => [$parcel],
+            'async'        => false,
+        ]]);
+        $shipData = json_decode($shipRes->getBody()->getContents(), true);
+
+        if (empty($shipData['rates'])) {
+            throw new \Exception('Shippo returned no rates for this shipment.');
+        }
+
+        // Pick cheapest available rate
+        $rates = collect($shipData['rates'])->filter(fn($r) => $r['object_state'] === 'VALID');
+        $rate  = $rates->sortBy(fn($r) => (float) $r['amount'])->first();
+
+        // Purchase label
+        $txRes  = $client->post('transactions/', ['headers' => $headers, 'json' => [
+            'rate'            => $rate['object_id'],
+            'label_file_type' => 'PDF_4X6',
+            'async'           => false,
+        ]]);
+        $txData = json_decode($txRes->getBody()->getContents(), true);
+
+        if (($txData['status'] ?? '') !== 'SUCCESS') {
+            throw new \Exception('Shippo label purchase failed: ' . ($txData['messages'][0]['text'] ?? 'unknown error'));
+        }
+
+        $shipment->shippo_transaction_id = $txData['object_id'];
+        $shipment->label_url             = $txData['label_url'];
+        if (!$shipment->tracking_number && !empty($txData['tracking_number'])) {
+            $shipment->tracking_number = $txData['tracking_number'];
+        }
+        $shipment->save();
+
+        return [
+            'status'       => 'success',
+            'type'         => 'us_shippo',
+            'label_url'    => $txData['label_url'],
+            'tracking'     => $txData['tracking_number'] ?? null,
+            'carrier'      => $rate['provider']          ?? null,
+            'service'      => $rate['servicelevel']['name'] ?? null,
+            'rate_amount'  => $rate['amount']             ?? null,
+            'rate_currency'=> $rate['currency']           ?? null,
+        ];
+    }
+
+    private function generateColombiaLabel(Shipment $shipment): array
+    {
+        $data = [
+            'shipment'         => $shipment,
+            'destinationCity'  => $shipment->destinationCity->name    ?? '',
+            'destinationState' => $shipment->destinationState->name   ?? '',
+            'destinationCountry' => $shipment->destinationCountry->name ?? 'Colombia',
+        ];
+
+        $pdf = PDF::loadView('Export.pdf.colombia_label', $data);
+        // 4×6 inches in points: 288 × 432
+        $pdf->setPaper([0, 0, 288, 432]);
+
+        $path    = 'labels/shipment-' . $shipment->id . '.pdf';
+        $pdfPath = storage_path('app/' . $path);
+
+        if (!is_dir(dirname($pdfPath))) {
+            mkdir(dirname($pdfPath), 0755, true);
+        }
+
+        $pdf->save($pdfPath);
+
+        $publicUrl = url('/api/shipping/' . $shipment->id . '/download-label');
+        $shipment->label_url = $publicUrl;
+        $shipment->save();
+
+        return [
+            'status'    => 'success',
+            'type'      => 'colombia_pdf',
+            'label_url' => $publicUrl,
+        ];
     }
 }

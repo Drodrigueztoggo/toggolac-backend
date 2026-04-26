@@ -721,14 +721,21 @@ class DlocalPaymentController extends Controller
 
             Log::info("Admin notified of new order #{$orderId} ({$invoiceNumber})");
 
-            // SMS via AT&T email-to-text gateway
-            $smsGateway = env('ADMIN_SMS_GATEWAY', '13053036278@txt.att.net');
-            Mail::to($smsGateway)->send(new AdminSmsOrderMail(
-                orderId:       $orderId,
-                invoiceNumber: $invoiceNumber,
-                customerName:  $customerName,
-                total:         $totalFormat,
-            ));
+            // Telegram push notification
+            $tgToken  = env('TELEGRAM_BOT_TOKEN');
+            $tgChatId = env('TELEGRAM_ADMIN_CHAT_ID');
+            if ($tgToken && $tgChatId) {
+                $text = "🛒 *Nueva compra confirmada*\n"
+                      . "📋 Orden: {$invoiceNumber}\n"
+                      . "👤 Cliente: {$customerName}\n"
+                      . "💰 Total: {$totalFormat}\n"
+                      . "🔗 [Ver orden](https://adm.toggolac.com/panel/compras/{$orderId})";
+
+                (new \GuzzleHttp\Client())->post(
+                    "https://api.telegram.org/bot{$tgToken}/sendMessage",
+                    ['json' => ['chat_id' => $tgChatId, 'text' => $text, 'parse_mode' => 'Markdown']]
+                );
+            }
 
         } catch (\Exception $e) {
             // Log but never let this kill the payment confirmation response
