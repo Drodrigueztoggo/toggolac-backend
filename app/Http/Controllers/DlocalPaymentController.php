@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Mail\AdminNewOrderMail;
 use App\Mail\PaymentConfirmOrderMail;
 use App\Models\Commission;
 use App\Models\Product;
@@ -663,6 +664,65 @@ class DlocalPaymentController extends Controller
                 'status' => 'error',
                 'message' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Notify admin of a confirmed purchase and queue any automated fulfillment.
+     * Called fire-and-forget after the DB transaction commits so a failure here
+     * never rolls back the payment confirmation.
+     */
+    private function dispatchFulfillment(int $orderId, $orderDetails): void
+    {
+        try {
+            $orderCtrl = new PurchaseOrderController();
+            $orderReq  = new \Illuminate\Http\Request(['no_paginate' => true]);
+            $orderInfo = $orderCtrl->showPurchaseOrder($orderReq, $orderId);
+
+            if (!isset($orderInfo['client'])) {
+                Log::warning("dispatchFulfillment: could not load order {$orderId}");
+                return;
+            }
+
+            $customerName  = trim(($orderInfo['client']['name'] ?? '') . ' ' . ($orderInfo['client']['last_name'] ?? ''));
+            $customerEmail = $orderInfo['client']['email'] ?? '';
+            $invoiceNumber = $orderInfo['invoice_number'] ?? "ORD-{$orderId}";
+            $totalFormat   = $orderInfo['total_product']['formatted'] ?? ($orderInfo['total_product']['amount'] ?? 0);
+            $products      = $orderInfo['purchase_order_details'] ?? [];
+
+            $addressParts = array_filter([
+                $orderInfo['destination_address']        ?? null,
+                $orderInfo['destinationCity']['name']    ?? null,
+                $orderInfo['destinationState']['name']   ?? null,
+                $orderInfo['destinationCountry']['name'] ?? null,
+            ]);
+            $shippingAddress = implode(', ', $addressParts) ?: null;
+
+            // Retrieve card details from the transaction already updated in the webhook
+            $tx = \App\Models\Transaction::where('purchase_order_id', $orderId)
+                ->orderBy('id', 'desc')->first();
+            $paymentBrand = $tx->payment_method_type ?? null;
+            $paymentLast4 = null; // stored on receipt, not on transaction
+
+            $adminEmail = env('ADMIN_NOTIFICATION_EMAIL', 'toggolac@gmail.com');
+
+            Mail::to($adminEmail)->send(new AdminNewOrderMail(
+                orderId:         $orderId,
+                invoiceNumber:   $invoiceNumber,
+                customerName:    $customerName,
+                customerEmail:   $customerEmail,
+                total:           $totalFormat,
+                products:        $products,
+                shippingAddress: $shippingAddress,
+                paymentBrand:    $paymentBrand,
+                paymentLast4:    $paymentLast4,
+            ));
+
+            Log::info("Admin notified of new order #{$orderId} ({$invoiceNumber})");
+
+        } catch (\Exception $e) {
+            // Log but never let this kill the payment confirmation response
+            Log::error("dispatchFulfillment failed for order {$orderId}: " . $e->getMessage());
         }
     }
 }
