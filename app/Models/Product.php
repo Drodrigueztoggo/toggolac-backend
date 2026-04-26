@@ -32,7 +32,9 @@ class Product extends Model
 
     public function getImageAttribute()
     {
-        return isset($this->image_product) ? url('storage/' . $this->image_product) : "";
+        if (!isset($this->image_product) || $this->image_product === '') return '';
+        if (str_starts_with($this->image_product, 'http')) return $this->image_product;
+        return url('storage/' . $this->image_product);
     }
 
     public function evaluations()
@@ -110,6 +112,7 @@ class Product extends Model
     {
         return [
             'id'                  => $this->id,
+            'status'              => 'available',
             'name_product'        => $this->name_product,
             'name_product_en'     => $this->name_product_en,
             'description_product' => $this->description_product,
