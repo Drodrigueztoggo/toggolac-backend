@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Mail\AdminNewOrderMail;
+use App\Mail\AdminSmsOrderMail;
 use App\Mail\PaymentConfirmOrderMail;
 use App\Models\Commission;
 use App\Models\Product;
@@ -719,6 +720,15 @@ class DlocalPaymentController extends Controller
             ));
 
             Log::info("Admin notified of new order #{$orderId} ({$invoiceNumber})");
+
+            // SMS via AT&T email-to-text gateway
+            $smsGateway = env('ADMIN_SMS_GATEWAY', '13053036278@txt.att.net');
+            Mail::to($smsGateway)->send(new AdminSmsOrderMail(
+                orderId:       $orderId,
+                invoiceNumber: $invoiceNumber,
+                customerName:  $customerName,
+                total:         $totalFormat,
+            ));
 
         } catch (\Exception $e) {
             // Log but never let this kill the payment confirmation response

@@ -1,0 +1,1 @@
+Toggo: Nueva compra {{ $invoiceNumber }} de {{ $customerName }} por {{ $total }}. Revisa adm.toggolac.com
