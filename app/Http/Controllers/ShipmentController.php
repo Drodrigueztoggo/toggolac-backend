@@ -253,6 +253,7 @@ class ShipmentController extends Controller
                     'guide_number' => $shipmentData->tracking_number,
                     'created_at' => Carbon::parse($shipmentData->created_at)->format('Y-m-d'),
                     'total_shipping_cost' =>  MoneyConvert::USD($shipmentData->total_shipping_cost),
+                    'label_url'  => $shipmentData->label_url,
                 ];
             })->toArray(); // Convertir la colección a un array;
 
@@ -324,8 +325,12 @@ class ShipmentController extends Controller
                 'origin_postal_code',
                 'destination_postal_code',
                 'pounds_weight',
+                'package_length',
+                'package_width',
+                'package_height',
                 'total_shipping_cost',
-                // 'current_cost',
+                'shippo_transaction_id',
+                'label_url',
                 'create_user_id'
             );
 
