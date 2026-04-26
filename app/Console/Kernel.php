@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Jobs\ProductPriceSyncJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -18,6 +19,8 @@ class Kernel extends ConsoleKernel
         // $schedule->command('inspire')->hourly();
         $schedule->command('currencies:update');
 
+        // Price sync: every 6 hours for all active 888lots products
+        $schedule->job(new ProductPriceSyncJob)->everySixHours();
     }
 
     /**

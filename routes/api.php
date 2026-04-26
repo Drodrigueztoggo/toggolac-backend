@@ -1,6 +1,7 @@
 <?php
 
 use App\Events\OrderCreated;
+use App\Http\Controllers\TelegramCallbackController;
 use App\Http\Controllers\AppServiceResourcesController;
 use App\Http\Controllers\BondController;
 use Illuminate\Http\Request;
@@ -416,6 +417,9 @@ Route::group(['prefix' => 'd-local'], function () {
             return "success payment";
         });
         Route::post('notification-url/{order_id}', 'notificationPayment');
+
+// Telegram inline-button callbacks (no auth — verified by Telegram origin)
+Route::post('telegram/callback', [TelegramCallbackController::class, 'handle']);
         Route::post('send-email/{order_id}', 'sendEmailConfirm');
 
         Route::get('exchange-rates', 'getExchangeRates');
