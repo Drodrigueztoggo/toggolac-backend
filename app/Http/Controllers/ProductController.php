@@ -57,7 +57,11 @@ class ProductController extends Controller
     public function getProductsListPublic()
     {
         try {
-            $products = Product::with('categories', 'brand', 'mall')->get();
+            $products = Product::with('categories', 'brand', 'mall')
+                ->whereNull('deleted_at')
+                ->latest()
+                ->limit(60)
+                ->get();
 
             return response()->json(
                 $products
