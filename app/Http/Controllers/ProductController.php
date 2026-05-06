@@ -492,6 +492,7 @@ class ProductController extends Controller
                     "brand_id" => $product->brand_id,
                     "mall_id" => $product->mall_id,
                     "image" => $product->image,
+                    "gallery" => $product->image_gallery,
                     "created_at" => $product->created_at,
                     "categories" => isset($product->categories) ? $product->categories : null,
                     "mall_products" => isset($product->mallProducts) ? $product->mallProducts : null,
