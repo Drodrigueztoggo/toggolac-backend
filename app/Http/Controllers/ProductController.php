@@ -632,6 +632,30 @@ class ProductController extends Controller
         }
     }
 
+    public function updateCategories(Request $request, int $id)
+    {
+        try {
+            $product = Product::findOrFail($id);
+            $categories = $request->input('selected_categories', []);
+            $stores     = $request->input('selected_stores', []);
+            $malls      = $request->input('selected_malls', []);
+
+            if (!empty($categories)) {
+                $product->categoriesRelation()->sync($categories);
+            }
+            if (!empty($stores)) {
+                $product->storeProductsRelation()->sync($stores);
+            }
+            if (!empty($malls)) {
+                $product->mallProductsRelation()->sync($malls);
+            }
+
+            return response()->json(['status' => 'ok', 'categories' => $categories]);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
     public function updateGallery(Request $request, int $id)
     {
         try {

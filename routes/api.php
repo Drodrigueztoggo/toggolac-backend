@@ -180,6 +180,7 @@ Route::group(['prefix' => 'products'], function () {
             Route::post('add', 'addProduct');
             Route::post('update', 'updateProduct');
             Route::post('update-gallery/{id}', 'updateGallery');
+            Route::post('update-categories/{id}', 'updateCategories');
             Route::delete('delete/{id}', 'deleteProduct');
             Route::post('show', 'showProduct');
         });
