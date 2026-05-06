@@ -179,6 +179,7 @@ Route::group(['prefix' => 'products'], function () {
             Route::get('get', 'getProducts');
             Route::post('add', 'addProduct');
             Route::post('update', 'updateProduct');
+            Route::post('update-gallery/{id}', 'updateGallery');
             Route::delete('delete/{id}', 'deleteProduct');
             Route::post('show', 'showProduct');
         });

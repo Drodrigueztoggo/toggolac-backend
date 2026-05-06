@@ -111,7 +111,7 @@ class WordpressServiceController extends Controller
                         ],
                         'image_product' => $offert->product->image,
                         'image'         => asset($offert->product->image),
-                        'gallery'       => $offert->product->gallery ?? [],
+                        'gallery'       => $offert->product->image_gallery,
                     ] : null,
                     'store_mall' => $offert->storeMall,
                 ];

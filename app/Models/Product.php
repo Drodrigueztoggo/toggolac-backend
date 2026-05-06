@@ -24,17 +24,32 @@ class Product extends Model
         'brand_id',
         // 'mall_id',
         'image_product',
+        'gallery',
         'supplier_url',
         'supplier_cost',
     ];
 
-    protected $appends = ['image'];
+    protected $casts = [
+        'gallery' => 'array',
+    ];
+
+    protected $appends = ['image', 'image_gallery'];
 
     public function getImageAttribute()
     {
         if (!isset($this->image_product) || $this->image_product === '') return '';
         if (str_starts_with($this->image_product, 'http')) return $this->image_product;
         return url('storage/' . $this->image_product);
+    }
+
+    public function getImageGalleryAttribute(): array
+    {
+        $stored = $this->gallery ?? [];
+        if (!empty($stored)) {
+            return array_values(array_filter($stored));
+        }
+        $main = $this->image;
+        return $main !== '' ? [$main] : [];
     }
 
     public function evaluations()

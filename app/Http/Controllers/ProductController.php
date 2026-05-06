@@ -567,12 +567,18 @@ class ProductController extends Controller
 
                 $product = Product::findOrFail($id);
 
-                $productData = $request->all();
+                $productData = $request->except(['gallery_urls']);
 
                 if ($request->hasFile('image_product')) {
                     $this->deleteImage($product->image_product);
                     $imagePath = $this->storeImage($request->file('image_product'));
                     $productData['image_product'] = $imagePath;
+                }
+
+                // Accept gallery as JSON array of URLs (from importer or backfill scripts)
+                if ($request->has('gallery_urls')) {
+                    $urls = $request->input('gallery_urls');
+                    $productData['gallery'] = is_array($urls) ? $urls : json_decode($urls, true) ?? [];
                 }
 
                 $product->update($productData);
@@ -623,6 +629,22 @@ class ProductController extends Controller
                 'status' => 'error',
                 'message' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function updateGallery(Request $request, int $id)
+    {
+        try {
+            $product = Product::findOrFail($id);
+            $urls = $request->input('gallery', []);
+            if (is_string($urls)) {
+                $urls = json_decode($urls, true) ?? [];
+            }
+            $product->gallery = array_values(array_filter((array) $urls));
+            $product->save();
+            return response()->json(['status' => 'ok', 'gallery' => $product->gallery]);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }
 
