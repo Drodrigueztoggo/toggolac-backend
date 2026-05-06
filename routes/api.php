@@ -17,6 +17,8 @@ use App\Http\Controllers\CommissionController;
 use App\Http\Controllers\CountrieController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\DlocalPaymentController;
+use App\Http\Controllers\FulfillmentController;
+use App\Http\Controllers\StripeController;
 use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\MallController;
 use App\Http\Controllers\OfferController;
@@ -436,6 +438,25 @@ Route::post('telegram/callback', [TelegramCallbackController::class, 'handle']);
     });
 });
 
+
+// ── Fulfillment worker API (key-authenticated, no user session needed) ────────
+Route::group(['prefix' => 'fulfillment'], function () {
+    Route::controller(FulfillmentController::class)->group(function () {
+        Route::get('pending',        'pending');
+        Route::post('{id}/update',   'update');
+    });
+});
+
+// ── Stripe ────────────────────────────────────────────────────────────────────
+Route::group(['prefix' => 'stripe'], function () {
+    Route::controller(StripeController::class)->group(function () {
+        Route::post('webhook',               'webhook');
+        Route::middleware(['checkAuth'])->group(function () {
+            Route::post('create-checkout',   'createCheckoutSession');
+            Route::get('session-status',     'sessionStatus');
+        });
+    });
+});
 
 Route::group(['prefix' => 'commisions'], function () {
     Route::controller(CommissionController::class)->group(function () {

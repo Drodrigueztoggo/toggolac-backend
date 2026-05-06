@@ -12,6 +12,7 @@ use App\Models\PurchaseOrderDetail;
 use App\Models\PurchaseOrderHeader;
 use App\Models\PurchaseOrderHeaderLog;
 use App\Models\ShoppingCart;
+use App\Models\FulfillmentJob;
 use App\Models\Transaction;
 use App\Models\TransactionLog;
 use GrahamCampbell\ResultType\Success;
@@ -721,6 +722,9 @@ class DlocalPaymentController extends Controller
 
             Log::info("Admin notified of new order #{$orderId} ({$invoiceNumber})");
 
+            // ── Queue 888lots fulfillment jobs (one per product with a supplier_url) ──
+            $this->createFulfillmentJobs($orderId, $orderInfo, 'dlocal');
+
             // Telegram push notification
             $tgToken  = env('TELEGRAM_BOT_TOKEN');
             $tgChatId = env('TELEGRAM_ADMIN_CHAT_ID');
@@ -740,6 +744,72 @@ class DlocalPaymentController extends Controller
         } catch (\Exception $e) {
             // Log but never let this kill the payment confirmation response
             Log::error("dispatchFulfillment failed for order {$orderId}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Create one FulfillmentJob per 888lots product in the order.
+     * Gateway 'dlocal' ships to Miami consolidation address.
+     * Gateway 'stripe' ships directly to the customer.
+     */
+    public function createFulfillmentJobs(int $orderId, array $orderInfo, string $gateway): void
+    {
+        try {
+            $products = $orderInfo['purchase_order_details'] ?? [];
+            $customerName = trim(
+                ($orderInfo['client']['name'] ?? '') . ' ' . ($orderInfo['client']['last_name'] ?? '')
+            );
+
+            if ($gateway === 'dlocal') {
+                $shippingMode     = 'consolidation';
+                $shippingName     = 'Toggolac / ' . $customerName;
+                $shippingAddress1 = '7819 NW 104TH AVE';
+                $shippingAddress2 = 'APT 6';
+                $shippingCity     = 'Miami';
+                $shippingState    = 'FL';
+                $shippingZip      = '33178';
+                $shippingCountry  = 'US';
+            } else {
+                // Stripe — ship directly to customer
+                $shippingMode     = 'direct';
+                $shippingName     = $customerName;
+                $shippingAddress1 = $orderInfo['destination_address'] ?? '';
+                $shippingAddress2 = null;
+                $shippingCity     = $orderInfo['destinationCity']['name']    ?? ($orderInfo['destination_city'] ?? '');
+                $shippingState    = $orderInfo['destinationState']['name']   ?? ($orderInfo['destination_state'] ?? '');
+                $shippingZip      = $orderInfo['destination_postal_code']    ?? '';
+                $shippingCountry  = 'US';
+            }
+
+            foreach ($products as $p) {
+                $supplierUrl = is_array($p) ? ($p['supplier_url'] ?? null) : ($p->supplier_url ?? null);
+                if (!$supplierUrl || !str_contains($supplierUrl, '888lots')) continue;
+
+                $productId   = is_array($p) ? ($p['product_id'] ?? null)  : ($p->product_id ?? null);
+                $productName = is_array($p) ? ($p['name_product'] ?? ($p['product']['name_product'] ?? ''))
+                                            : ($p->name_product  ?? '');
+
+                FulfillmentJob::create([
+                    'order_id'         => $orderId,
+                    'product_id'       => $productId,
+                    'product_name'     => $productName,
+                    'supplier_url'     => $supplierUrl,
+                    'gateway'          => $gateway,
+                    'shipping_mode'    => $shippingMode,
+                    'shipping_name'    => $shippingName,
+                    'shipping_address1'=> $shippingAddress1,
+                    'shipping_address2'=> $shippingAddress2,
+                    'shipping_city'    => $shippingCity,
+                    'shipping_state'   => $shippingState,
+                    'shipping_zip'     => $shippingZip,
+                    'shipping_country' => $shippingCountry,
+                    'status'           => 'pending',
+                ]);
+
+                Log::info("FulfillmentJob created for order #{$orderId} product '{$productName}' via {$gateway}");
+            }
+        } catch (\Exception $e) {
+            Log::error("createFulfillmentJobs failed for order #{$orderId}: " . $e->getMessage());
         }
     }
 }

@@ -397,6 +397,7 @@ class PurchaseOrderController extends Controller
                     "destination_state_id" => $order->destination_state_id,
                     "destination_country_id" => $order->destination_country_id,
                     "destination_address" => $order->destination_address,
+                    "destination_postal_code" => $order->destination_postal_code,
                     "estimated_date" => $order->estimated_date,
                     "guide_number" => isset($order->shipment->tracking_number) ? $order->shipment->tracking_number : null,
                     "conveyor_id" => $order->conveyor_id,

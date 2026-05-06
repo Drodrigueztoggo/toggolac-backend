@@ -22,6 +22,7 @@ class PurchaseOrderHeader extends Model
         'purchase_status_id',
         'personal_shopper_id',
         'destination_address',
+        'destination_postal_code',
         'destination_country_id',
         'destination_state_id',
         'origin_city_id',
