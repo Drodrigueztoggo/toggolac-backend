@@ -81,8 +81,12 @@ class WordpressServiceController extends Controller
 
                 return [
                     'id'            => $offert->id,
-                    'name'          => $isEn ? $translate->translateText($offert->name, $TGGlanguage) : $offert->name,
-                    'description'   => $isEn ? $translate->translateText($offert->description, $TGGlanguage) : $offert->description,
+                    'name'          => $isEn
+                        ? ($offert->product->name_product_en ?? $offert->name)
+                        : $offert->name,
+                    'description'   => $isEn
+                        ? ($offert->product->description_product_en ?? $offert->description)
+                        : $offert->description,
                     'product_id'    => $offert->product_id,
                     'end_date'      => $offert->end_date,
                     'store_mall_id' => $offert->store_mall_id,
