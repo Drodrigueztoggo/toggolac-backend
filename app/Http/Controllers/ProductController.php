@@ -213,7 +213,9 @@ class ProductController extends Controller
                     "id" => $prod['id'],
                     "rating" => $rating,
                     "created_at" => $prod['created_at'],
-                    "name_product" => $isEn ? ($prod['name_product_en'] ?? $prod['name_product']) : $prod['name_product'],
+                    "name_product" => $isEn
+                        ? ($prod['name_product_en'] ?? $prod['name_product'])
+                        : (strlen($prod['name_product']) === 85 ? ($prod['name_product_en'] ?? $prod['name_product']) : $prod['name_product']),
                     "description_product" => $isEn ? ($prod['description_product_en'] ?? $prod['description_product']) : $prod['description_product'],
                     // "price_from" => $prod['price_from'],
                     // "price_to" => $prod['price_to'],
@@ -425,7 +427,9 @@ class ProductController extends Controller
 
             $response = [
                 "id" => $product["id"],
-                "name_product" => $isEn ? ($product["name_product_en"] ?? $product["name_product"]) : $product["name_product"],
+                "name_product" => $isEn
+                    ? ($product["name_product_en"] ?? $product["name_product"])
+                    : (strlen($product["name_product"]) === 85 ? ($product["name_product_en"] ?? $product["name_product"]) : $product["name_product"]),
                 "description_product" => $isEn ? ($product["description_product_en"] ?? $product["description_product"]) : $product["description_product"],
                 "price_from" => $currencyFunctions->convertAmount('USD', $currency, $product["price_from"] ? $product["price_from"]: 0),
                 "price_to" => $currencyFunctions->convertAmount('USD', $currency, $product["price_to"] ? $product["price_to"]: 0),
@@ -478,7 +482,9 @@ class ProductController extends Controller
                 $data = [
                     "id" => $product->id,
                     "rating" => $rating,
-                    "name_product" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? ($product->name_product_en ?? $product->name_product) : $product->name_product,
+                    "name_product" => $isEn
+                        ? ($product->name_product_en ?? $product->name_product)
+                        : (strlen($product->name_product) === 85 ? ($product->name_product_en ?? $product->name_product) : $product->name_product),
                     "description_product" => str_starts_with(strtolower((string)($TGGlanguage ?? '')), 'en') ? ($product->description_product_en ?? $product->description_product) : $product->description_product,
                     "price_from" => isset($product->price_from) ? $currencyFunctions->convertAmount('USD', $currency, $product->price_from) : 0,
                     "price_to" => isset($product->price_to) ? $currencyFunctions->convertAmount('USD', $currency, $product->price_to) : 0,
