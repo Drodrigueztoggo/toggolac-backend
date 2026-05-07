@@ -27,6 +27,7 @@ class Product extends Model
         'gallery',
         'supplier_url',
         'supplier_cost',
+        'segment',
     ];
 
     protected $casts = [

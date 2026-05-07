@@ -125,6 +125,7 @@ class ProductController extends Controller
             $filter_store_mall_id = $request->query('store_mall_id');
             $filter_brand_id = $request->query('brand_id');
             $filter_category_id = $request->query('category_id');
+            $filter_segment = $request->query('segment');
             $no_paginate = $request->query('no_paginate');
 
             $filter_start_date = $request->query('filter_start_date');
@@ -155,8 +156,9 @@ class ProductController extends Controller
             if (isset($filter_brand_id)) {
                 $productsQuery->where('brand_id', $filter_brand_id);
             }
-
-
+            if (isset($filter_segment)) {
+                $productsQuery->whereIn('segment', explode(',', $filter_segment));
+            }
 
             if (isset($filter_category_id)) {
                 $productsQuery->whereHas('categories', function ($query) use ($filter_category_id) {

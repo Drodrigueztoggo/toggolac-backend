@@ -266,11 +266,12 @@ class WordpressServiceController extends Controller
             $filter_mall     = $request->query('mall_id');
             $filter_store    = $request->query('store_id');
             $filter_order    = $request->query('order');
+            $filter_segment  = $request->query('segment');
             $page            = $request->query('page', 1);
 
             $cacheKey = 'products_paginate_v2_' . md5(implode('_', [
                 $currency, $TGGlanguage, $per_page, $page, $filter_limit,
-                $filter_category, $filter_brand, $filter_mall, $filter_store, $filter_order,
+                $filter_category, $filter_brand, $filter_mall, $filter_store, $filter_order, $filter_segment,
             ]));
             $cached = Cache::get($cacheKey);
             if ($cached !== null) {
@@ -302,11 +303,14 @@ class WordpressServiceController extends Controller
                     $q->whereIn('store_malls.id', $filter_store_array);
                 });
             }
+            if (isset($filter_segment)) {
+                $productsQuery->whereIn('segment', explode(',', $filter_segment));
+            }
             if (isset($filter_limit)) {
                 $productsQuery->limit($filter_limit);
             }
 
-            $productsQuery->select('id', 'name_product AS name', 'name_product_en', 'price_from', 'price_to', 'image_product', 'brand_id', 'description_product', 'description_product_en');
+            $productsQuery->select('id', 'name_product AS name', 'name_product_en', 'price_from', 'price_to', 'image_product', 'brand_id', 'description_product', 'description_product_en', 'segment');
 
             $products = ($filter_order === 'rand')
                 ? $productsQuery->inRandomOrder()->paginate($per_page)
@@ -351,6 +355,7 @@ class WordpressServiceController extends Controller
                     ],
                     'price_origin' => $product->price_from,
                     'image'        => asset($product->image),
+                    'segment'      => $product->segment,
                 ];
             });
 
