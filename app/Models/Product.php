@@ -28,6 +28,7 @@ class Product extends Model
         'supplier_url',
         'supplier_cost',
         'segment',
+        'lots_category',
     ];
 
     protected $casts = [
