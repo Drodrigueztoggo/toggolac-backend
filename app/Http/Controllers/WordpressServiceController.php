@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Currency;
 use App\Models\Offer;
 use App\Models\Product;
+use App\Support\Translations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Cknow\Money\Money as MoneyConvert;
@@ -30,7 +31,6 @@ class WordpressServiceController extends Controller
                 return response()->json($cached);
             }
 
-            $translate        = new GoogleTranslateController();
             $currencyFunctions = new CurrencyController();
 
             // Limit to 300 rows — enough to fill all categories (max ~20 × 6 = 120 needed)
@@ -76,7 +76,7 @@ class WordpressServiceController extends Controller
             // Format helper — uses pre-translated name_product_en when available,
             // falls back to translateText only for offer name/description (not brands,
             // which are almost always English already).
-            $formatOffer = function ($offert) use ($translate, $TGGlanguage, $isEn, $currencyFunctions, $currency) {
+            $formatOffer = function ($offert) use ($isEn, $currencyFunctions, $currency) {
                 $rating = $offert->product->evaluations_avg_rating ?? 0;
 
                 return [
@@ -125,7 +125,7 @@ class WordpressServiceController extends Controller
             $categoryOffers = collect(array_values($grouped))
                 ->map(fn($group) => [
                     'id'     => $group['id'],
-                    'name'   => $group['name'],
+                    'name'   => $isEn ? Translations::category($group['name']) : $group['name'],
                     'offers' => collect($group['items'])->map($formatOffer)->values(),
                 ])
                 ->filter(fn($g) => count($g['offers']) > 0)

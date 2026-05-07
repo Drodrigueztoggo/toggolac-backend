@@ -353,7 +353,6 @@ class ShoppingCartController extends Controller
             $TGGlanguage = $request->TGGlanguage;
             $currency = $request->currency;
 
-            $translate = new GoogleTranslateController();
             $currencyFunctions = new CurrencyController();
 
 

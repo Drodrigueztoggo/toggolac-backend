@@ -8,6 +8,7 @@ use App\Http\Requests\AddBrandRequest;
 use App\Http\Requests\UpdateBrandRequest;
 use App\Models\Brand;
 use App\Models\BrandCategory;
+use App\Support\Translations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Exception;
@@ -20,17 +21,12 @@ class BrandController extends Controller
     public function getBrandsList(Request $request)
     {
         try {
-            $TGGlanguage = $request->TGGlanguage;
-            $translate = new GoogleTranslateController();
-
-
             $brands = Brand::select('id', 'name_brand as name')->get();
 
-
-            $brandsFormat = $brands->map(function ($item) use ($translate, $TGGlanguage) {
+            $brandsFormat = $brands->map(function ($item) {
                 return [
                     "id" => $item['id'],
-                    "name" => $TGGlanguage != 'es' ? $translate->translateText($item['name'], $TGGlanguage) : $item['name'],
+                    "name" => $item['name'],
                 ];
             });
 
@@ -50,17 +46,12 @@ class BrandController extends Controller
     public function getBrandsListPublic(Request $request)
     {
         try {
-            $TGGlanguage = $request->TGGlanguage;
-            $translate = new GoogleTranslateController();
-
-
             $brands = Brand::select('id', 'name_brand AS name')->get();
 
-
-            $brandsFormat = $brands->map(function ($item) use ($translate, $TGGlanguage) {
+            $brandsFormat = $brands->map(function ($item) {
                 return [
                     "id" => $item['id'],
-                    "name" => $TGGlanguage != 'es' ? $translate->translateText($item['name'], $TGGlanguage) : $item['name'],
+                    "name" => $item['name'],
                 ];
             });
 
@@ -108,7 +99,7 @@ class BrandController extends Controller
     {
         try {
             $TGGlanguage = $request->TGGlanguage;
-            $translate = new GoogleTranslateController();
+            $isEn = $TGGlanguage !== 'es';
 
 
             $perPage = $request->per_page ? $request->per_page : 20;
@@ -169,30 +160,29 @@ class BrandController extends Controller
                 $brands = $brandsQuery->paginate($perPage);
             }
 
-            $brandsFormat = $brands->map(function ($item) use ($translate, $TGGlanguage) {
+            $brandsFormat = $brands->map(function ($item) use ($isEn) {
 
-                $categoriesFormat = collect($item['categories'])->map(function ($category) use ($translate, $TGGlanguage) {
+                $categoriesFormat = collect($item['categories'])->map(function ($category) use ($isEn) {
                     return [
                         "id" => $category['id'],
-                        "name" => $TGGlanguage != 'es' ? $translate->translateText($category['name'], $TGGlanguage) : $category['name'],
-                    ];
-                });
-           
-                $storesFormat = collect($item['storeMall'])->map(function ($store) use ($translate, $TGGlanguage) {
-                    return [
-                        "id" => $store['id'],
-                        "name" => $TGGlanguage != 'es' ? $translate->translateText($store['name'], $TGGlanguage) : $store['name'],
+                        "name" => $isEn ? Translations::category($category['name']) : $category['name'],
                     ];
                 });
 
+                $storesFormat = collect($item['storeMall'])->map(function ($store) {
+                    return [
+                        "id" => $store['id'],
+                        "name" => $store['name'],
+                    ];
+                });
 
                 return [
                     "id" => $item['id'],
-                    "name_brand" => $TGGlanguage != 'es' ? $translate->translateText($item['name_brand'], $TGGlanguage) : $item['name_brand'],
+                    "name_brand" => $item['name_brand'],
                     "country_id" => $item['country_id'],
                     "state_id" => $item['state_id'],
                     "city_id" => $item['city_id'],
-                    "description_brand" => $TGGlanguage != 'es' ? $translate->translateText($item['description_brand'], $TGGlanguage) : $item['description_brand'],
+                    "description_brand" => $item['description_brand'],
                     "mall_id" => $item['mall_id'],
                     "image_brand" => $item['image_brand'],
                     "image" => $item['image'],
@@ -200,7 +190,6 @@ class BrandController extends Controller
                     "country" => $item['country'],
                     "city" => $item['city'],
                     "store_mall" => $storesFormat,
-
                 ];
             });
 

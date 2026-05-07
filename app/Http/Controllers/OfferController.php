@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\Brand;
 use App\Models\StoreMall;
 use App\Models\Mall;
+use App\Support\Translations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Exception;
@@ -22,10 +23,10 @@ class OfferController extends Controller
     {
         try {
 
-            $translate = new GoogleTranslateController();
             $currencyFunctions = new CurrencyController();
 
             $TGGlanguage = $request->TGGlanguage;
+            $isEn = $TGGlanguage !== 'es';
             $currency = $request->currency;
 
             $malls = array();
@@ -98,8 +99,8 @@ class OfferController extends Controller
                 }
             }
 
-            // return $products; 
-            $formattedProducts = collect($products)->map(function ($product) use ($TGGlanguage, $translate, $currencyFunctions, $currency) {
+            // return $products;
+            $formattedProducts = collect($products)->map(function ($product) use ($isEn, $currencyFunctions, $currency) {
 
                 $uniqueCountries = null;
                 $malls = null;
@@ -116,11 +117,10 @@ class OfferController extends Controller
 
                 if (isset($product->mallProducts)) {
                     $malls = collect($product->mallProducts)
-                        ->map(function ($mall) use ($TGGlanguage, $translate) {
-
+                        ->map(function ($mall) {
                             return [
                                 'id' => $mall->id,
-                                "name" => $TGGlanguage != 'es' ? $translate->translateText($mall->name, $TGGlanguage) : $mall->name,
+                                "name" => $mall->name,
                                 'image' => $mall->image,
                                 'country_info' => $mall->countryInfo,
                             ];
@@ -128,18 +128,15 @@ class OfferController extends Controller
                 }
 
                 if (isset($product->categoriesProduct)) {
-
-
                     $categories = collect($product->categoriesProduct)
-                        ->map(function ($category) use ($TGGlanguage, $translate) {
+                        ->map(function ($category) use ($isEn) {
                             return [
                                 'id' => $category->category_id,
-                                "name" => $TGGlanguage != 'es' ? $translate->translateText($category->category->name_category, $TGGlanguage) : $category->category->name_category,
+                                "name" => $isEn ? Translations::category($category->category->name_category) : $category->category->name_category,
                                 'image' => $category->category->image,
                             ];
                         });
                 }
-
 
                 return [
                     'id' => $product->id,
@@ -152,15 +149,15 @@ class OfferController extends Controller
                     'categories' => $categories,
                     'brand' => isset($product->brand) ? [
                         "id" => $product->brand->id,
-                        "name_brand" => $TGGlanguage != 'es' ? $translate->translateText($product->brand->name_brand, $TGGlanguage) : $product->brand->name_brand,
+                        "name_brand" => $product->brand->name_brand,
                         "image" => $product->brand->image
                     ] : null,
                     'mall_products' => $malls,
                     'countries' => $uniqueCountries,
-                    "name_product" => $TGGlanguage != 'es' ? $translate->translateText($product->name_product, $TGGlanguage) : $product->name_product,
-                    "description_product" => $TGGlanguage != 'es' ? $translate->translateText($product->description_product, $TGGlanguage) : $product->description_product,
+                    "name_product" => $isEn ? ($product->name_product_en ?? $product->name_product) : $product->name_product,
+                    "description_product" => $isEn ? ($product->description_product_en ?? $product->description_product) : $product->description_product,
                     'price' => [
-                        'min' => $product->price_from ?  $currencyFunctions->convertAmount('USD', $currency, $product->price_from) : 0,
+                        'min' => $product->price_from ? $currencyFunctions->convertAmount('USD', $currency, $product->price_from) : 0,
                         'max' => $product->price_to ? $currencyFunctions->convertAmount('USD', $currency, $product->price_to) : 0
                     ],
                     // 'image_product' => $product->image,
@@ -170,11 +167,10 @@ class OfferController extends Controller
 
 
             $mallsFormat = collect($malls)
-                ->map(function ($mall) use ($TGGlanguage, $translate, $currencyFunctions, $currency) {
-
+                ->map(function ($mall) use ($currencyFunctions, $currency) {
                     return [
                         "id" => $mall->id,
-                        "name_mall" => $TGGlanguage != 'es' ? $translate->translateText($mall->name_mall, $TGGlanguage) : $mall->name_mall,
+                        "name_mall" => $mall->name_mall,
                         "country_id" => $mall->country_id,
                         "state_id" => $mall->state_id,
                         "city_id" => $mall->city_id,
@@ -187,17 +183,14 @@ class OfferController extends Controller
                         "off_discount_percentage_to" => $mall->off_discount_percentage_to,
                         'off_discount_price_from' => isset($mall->off_discount_price_from) ? $currencyFunctions->convertAmount('USD', $currency, $mall->off_discount_price_from) : 0,
                         'off_discount_price_to' => isset($mall->off_discount_price_to) ? $currencyFunctions->convertAmount('USD', $currency, $mall->off_discount_price_to) : 0,
-
-
                     ];
                 });
 
             $storesFormat = collect($stores)
-                ->map(function ($store) use ($TGGlanguage, $translate, $currencyFunctions, $currency) {
-
+                ->map(function ($store) use ($currencyFunctions, $currency) {
                     return [
                         "id" => $store->id,
-                        "store" => $TGGlanguage != 'es' ? $translate->translateText($store->store, $TGGlanguage) : $store->store,
+                        "store" => $store->store,
                         "address" => $store->address,
                         "num_phone" => $store->num_phone,
                         "mall_id" => $store->mall_id,
@@ -207,18 +200,15 @@ class OfferController extends Controller
                         "off_discount_percentage_to" => $store->off_discount_percentage_to,
                         'off_discount_price_from' => isset($store->off_discount_price_from) ? $currencyFunctions->convertAmount('USD', $currency, $store->off_discount_price_from) : 0,
                         'off_discount_price_to' => isset($store->off_discount_price_to) ? $currencyFunctions->convertAmount('USD', $currency, $store->off_discount_price_to) : 0,
-
-
                     ];
                 });
 
             $brandsFormat = collect($brands)
-                ->map(function ($brand) use ($TGGlanguage, $translate, $currencyFunctions, $currency) {
-
+                ->map(function ($brand) use ($currencyFunctions, $currency) {
                     return [
                         "id" => $brand->id,
-                        "name_brand" => $TGGlanguage != 'es' ? $translate->translateText($brand->name_brand, $TGGlanguage) : $brand->name_brand,
-                        "description_brand" => $TGGlanguage != 'es' ? $translate->translateText($brand->description_brand, $TGGlanguage) : $brand->description_brand,
+                        "name_brand" => $brand->name_brand,
+                        "description_brand" => $brand->description_brand,
                         "country_id" => $brand->country_id,
                         "state_id" => $brand->state_id,
                         "city_id" => $brand->city_id,
@@ -325,8 +315,8 @@ class OfferController extends Controller
     {
         try {
 
-            $translate = new GoogleTranslateController();
             $TGGlanguage = $request->TGGlanguage;
+            $isEn = $TGGlanguage !== 'es';
 
             $currencyFunctions = new CurrencyController();
             $currency = $request->currency;
@@ -360,19 +350,18 @@ class OfferController extends Controller
             $offers = $query->paginate($perPage);
 
 
-            $offersFormat = $offers->map(function ($offer) use ($TGGlanguage, $translate,  $currencyFunctions, $currency) {
+            $offersFormat = $offers->map(function ($offer) use ($isEn, $currencyFunctions, $currency) {
 
                 $rating = 0;
-                
-                if(isset($offer['product'])){
-                    $rating =  isset($offer['product']['evaluations']) && count($offer['product']['evaluations']) > 0 ? $offer['product']['evaluations']->avg('rating') : 0;
-                }
 
+                if (isset($offer['product'])) {
+                    $rating = isset($offer['product']['evaluations']) && count($offer['product']['evaluations']) > 0 ? $offer['product']['evaluations']->avg('rating') : 0;
+                }
 
                 return [
                     "id" => $offer['id'],
-                    "name" => $TGGlanguage != 'es' ? $translate->translateText($offer['name'], $TGGlanguage) : $offer['name'],
-                    "description" => $TGGlanguage != 'es' ? $translate->translateText($offer['description'], $TGGlanguage) : $offer['description'],
+                    "name" => $offer['name'],
+                    "description" => $offer['description'],
                     "discount_percentage_from" => $offer['discount_percentage_from'],
                     "discount_percentage_to" => $offer['discount_percentage_to'],
                     "discount_price_from" => $currencyFunctions->convertAmount('USD', $currency, $offer['discount_price_from'] ? $offer['discount_price_from'] : 0),
@@ -392,21 +381,21 @@ class OfferController extends Controller
                     "country" => $offer['country'],
                     "mall" => isset($offer['mall']) ? [
                         "id" => $offer['mall']['id'],
-                        "name" => $TGGlanguage != 'es' ? $translate->translateText($offer['mall']['name'], $TGGlanguage) : $offer['mall']['name'],
+                        "name" => $offer['mall']['name'],
                     ] : null,
                     "store_mall" => isset($offer['storeMall']) ? [
                         "id" => $offer['storeMall']['id'],
-                        "name" => $TGGlanguage != 'es' ? $translate->translateText($offer['storeMall']['name'], $TGGlanguage) : $offer['storeMall']['name'],
+                        "name" => $offer['storeMall']['name'],
                     ] : null,
                     "brand" => isset($offer['brand']) ? [
                         "id" => $offer['brand']['id'],
-                        "image_brand" =>isset($offer['brand']['image_brand']) ? $offer['brand']['image_brand'] : null,
+                        "image_brand" => isset($offer['brand']['image_brand']) ? $offer['brand']['image_brand'] : null,
                         "image" => isset($offer['brand']['image']) ? $offer['brand']['image'] : null,
-                        "name" => $TGGlanguage != 'es' ? $translate->translateText($offer['brand']['name'], $TGGlanguage) : $offer['brand']['name'],
+                        "name" => $offer['brand']['name'],
                     ] : null,
                     "product" => isset($offer['product']) ? [
                         "id" => $offer['product']['id'],
-                        "name" => $TGGlanguage != 'es' ? $translate->translateText($offer['product']['name'], $TGGlanguage) : $offer['product']['name'],
+                        "name" => $isEn ? ($offer['product']['name_product_en'] ?? $offer['product']['name']) : $offer['product']['name'],
                         "image_product" => $offer['product']['image_product'],
                         "brand_id" => $offer['product']['brand_id'],
                         "price_from" => $currencyFunctions->convertAmount('USD', $currency, $offer['product']['price_from'] ? $offer['product']['price_from'] : 0),
@@ -475,20 +464,18 @@ class OfferController extends Controller
     {
         try {
 
-            $translate = new GoogleTranslateController();
             $TGGlanguage = $request->TGGlanguage;
+            $isEn = $TGGlanguage !== 'es';
 
             $currencyFunctions = new CurrencyController();
             $currency = $request->currency;
 
             $offer = Offer::with('country', 'mall', 'storeMall', 'brand', 'product')->findOrFail($request->id);
 
-
-            
             $offerFormat = [
                 "id" => $offer['id'],
-                "name" => $TGGlanguage != 'es' ? $translate->translateText($offer['name'], $TGGlanguage) : $offer['name'],
-                "description" => $TGGlanguage != 'es' ? $translate->translateText($offer['description'], $TGGlanguage) : $offer['description'],
+                "name" => $offer['name'],
+                "description" => $offer['description'],
                 "discount_percentage_from" => $offer['discount_percentage_from'],
                 "discount_percentage_to" => $offer['discount_percentage_to'],
                 "discount_price_from" => $currencyFunctions->convertAmount('USD', $currency, $offer['discount_price_from'] ? $offer['discount_price_from'] : 0),
@@ -508,19 +495,19 @@ class OfferController extends Controller
                 "country" => $offer['country'],
                 "mall" => isset($offer['mall']) ? [
                     "id" => $offer['mall']['id'],
-                    "name" => $TGGlanguage != 'es' ? $translate->translateText($offer['mall']['name'], $TGGlanguage) : $offer['mall']['name'],
+                    "name" => $offer['mall']['name'],
                 ] : null,
                 "store_mall" => isset($offer['storeMall']) ? [
                     "id" => $offer['storeMall']['id'],
-                    "name" => $TGGlanguage != 'es' ? $translate->translateText($offer['storeMall']['name'], $TGGlanguage) : $offer['storeMall']['name'],
+                    "name" => $offer['storeMall']['name'],
                 ] : null,
                 "brand" => isset($offer['brand']) ? [
                     "id" => $offer['brand']['id'],
-                    "name" => $TGGlanguage != 'es' ? $translate->translateText($offer['brand']['name'], $TGGlanguage) : $offer['brand']['name'],
+                    "name" => $offer['brand']['name'],
                 ] : null,
                 "product" => isset($offer['product']) ? [
                     "id" => $offer['product']['id'],
-                    "name" => $TGGlanguage != 'es' ? $translate->translateText($offer['product']['name'], $TGGlanguage) : $offer['product']['name'],
+                    "name" => $isEn ? ($offer['product']['name_product_en'] ?? $offer['product']['name']) : $offer['product']['name'],
                     "image_product" => $offer['product']['image_product'],
                     "brand_id" => $offer['product']['brand_id'],
                     "price_from" => $currencyFunctions->convertAmount('USD', $currency, $offer['product']['price_from'] ? $offer['product']['price_from'] : 0),

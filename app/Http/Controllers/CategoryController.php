@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\AddCategoryRequest;
 use App\Http\Requests\UpdateCategoryRequest;
 use App\Models\Category;
+use App\Support\Translations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Exception;
@@ -17,15 +18,14 @@ class CategoryController extends Controller
     {
         try {
             $TGGlanguage = $request->TGGlanguage;
-            $translate = new GoogleTranslateController();
-
+            $isEn = $TGGlanguage !== 'es';
 
             $category = Category::select('id', 'name_category as name', 'image_category')->get();
 
-            $categoryFormat = $category->map(function ($item) use ($translate, $TGGlanguage) {
+            $categoryFormat = $category->map(function ($item) use ($isEn) {
                 return [
                     "id" => $item['id'],
-                    "name" => $TGGlanguage != 'es' ? $translate->translateText($item['name'], $TGGlanguage) : $item['name'],
+                    "name" => $isEn ? Translations::category($item['name']) : $item['name'],
                     "image" => $item['image']
                 ];
             });
@@ -49,28 +49,24 @@ class CategoryController extends Controller
         try {
 
             $TGGlanguage = $request->TGGlanguage;
+            $isEn = $TGGlanguage !== 'es';
 
             $perPage = $request->query('per_page', 20);
             $filter_name = $request->query('name');
 
-
             $category = Category::select('id', 'name_category as name', 'description_category as description', 'image_category');
 
             if (isset($filter_name)) {
-                $category =   $category->where('name_category', 'like', "%$filter_name%"); // Aplica el filtro si se proporciona el nombre
+                $category = $category->where('name_category', 'like', "%$filter_name%");
             }
 
             $category = $category->paginate($perPage);
 
-            $translate = new GoogleTranslateController();
-
-
-
-            $categoryFormat = $category->map(function ($item) use ($translate, $TGGlanguage) {
+            $categoryFormat = $category->map(function ($item) use ($isEn) {
                 return [
                     "id" => $item['id'],
-                    "name" => $TGGlanguage != 'es' ? $translate->translateText($item['name'], $TGGlanguage) : $item['name'],
-                    "description" => $TGGlanguage != 'es' ? $translate->translateText($item['description'], $TGGlanguage) : $item['description'],
+                    "name" => $isEn ? Translations::category($item['name']) : $item['name'],
+                    "description" => $item['description'],
                     "image" => $item['image']
                 ];
             });

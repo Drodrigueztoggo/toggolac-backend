@@ -15,6 +15,7 @@ use App\Models\PurchaseOrderDetailTax;
 use App\Models\PurchaseOrderHeaderLog;
 use App\Models\ShoppingCart;
 use App\Models\User;
+use App\Support\Translations;
 use Carbon\Carbon;
 use Exception;
 use Cknow\Money\Money as MoneyConvert;
@@ -89,8 +90,8 @@ class PurchaseOrderController extends Controller
     public function getPurchaseOrder(Request $request)
     {
         try {
-            $translate = new GoogleTranslateController();
             $TGGlanguage = $request->TGGlanguage;
+            $isEn = $TGGlanguage !== 'es';
             $currencyFunctions = new CurrencyController();
             $currency = $request->currency;
 
@@ -227,18 +228,18 @@ class PurchaseOrderController extends Controller
                 $purchaseOrder = $purchaseOrder->orderBy('created_at', 'desc')->paginate($per_gage);
             }
 
-            $purchaseOrderFormat = $purchaseOrder->map(function ($order) use ($TGGlanguage, $translate, $currencyFunctions, $currency) {
+            $purchaseOrderFormat = $purchaseOrder->map(function ($order) use ($isEn, $currencyFunctions, $currency) {
                 // MoneyConvert::USD($product->price)
-                $detailsProducts = collect($order['purchaseOrderDetails'])->map(function ($detailsProduct) use ($TGGlanguage, $translate, $currencyFunctions, $currency) {
+                $detailsProducts = collect($order['purchaseOrderDetails'])->map(function ($detailsProduct) use ($isEn, $currencyFunctions, $currency) {
                     $taxes = json_decode($detailsProduct->purchaseOrderDetailTax->taxes);
                     // MoneyConvert::USD($product->price)
                     if (isset($detailsProduct->product->categoriesRelation)) {
                         $categories = collect($detailsProduct->product->categoriesRelation)
-                            ->map(function ($category) use ($TGGlanguage, $translate) {
+                            ->map(function ($category) use ($isEn) {
                                 return [
                                     'id' => $category->id,
-                                    "name" => $TGGlanguage != 'es' ? $translate->translateText($category->name_category, $TGGlanguage) : $category->name_category,
-                                    "description_category" => $TGGlanguage != 'es' ? $translate->translateText($category->description_category, $TGGlanguage) : $category->description_category,
+                                    "name" => $isEn ? Translations::category($category->name_category) : $category->name_category,
+                                    "description_category" => $category->description_category,
                                     'image' => $category->image,
                                 ];
                             });
@@ -258,7 +259,7 @@ class PurchaseOrderController extends Controller
                         "store" => isset($detailsProduct->store) ?
                             [
                                 "id" => $detailsProduct->store->id,
-                                "name" => $TGGlanguage != 'es' ? $translate->translateText($detailsProduct->store->name, $TGGlanguage) : $detailsProduct->store->name,
+                                "name" => $detailsProduct->store->name,
                                 "image_store" => $detailsProduct->store->image_store,
                                 "mall_id" => $detailsProduct->store->mall_id,
                                 "image" => $detailsProduct->store->image,
@@ -266,14 +267,14 @@ class PurchaseOrderController extends Controller
                             : null,
                             "product" => isset($detailsProduct->product) ? [
                             "id" => $detailsProduct->product->id,
-                            "name" => $TGGlanguage != 'es' ? $translate->translateText($detailsProduct->product->name, $TGGlanguage) : $detailsProduct->product->name,
+                            "name" => $isEn ? ($detailsProduct->product->name_product_en ?? $detailsProduct->product->name) : $detailsProduct->product->name,
                             "price_from" => (int)$detailsProduct->product->price_from,
                             "price_to" => (int)$detailsProduct->product->price_to,
                             "image" => $detailsProduct->product->image,
                             "categories" => $categories,
                             "brand" => isset($detailsProduct->product->brand) ? [
                                 "id" => $detailsProduct->product->brand->id,
-                                "name_brand" => $TGGlanguage != 'es' ? $translate->translateText($detailsProduct->product->brand->name_brand, $TGGlanguage) : $detailsProduct->product->brand->name_brand,
+                                "name_brand" => $detailsProduct->product->brand->name_brand,
                                 "image" => $detailsProduct->product->brand->image,
                             ] : null,
                         ] : null,
@@ -376,13 +377,13 @@ class PurchaseOrderController extends Controller
                     "shipment_status" => isset($order->shipment->shipmentStatus) ?
                         [
                             "id" => $order->shipment->shipmentStatus->id,
-                            "name" => $TGGlanguage != 'es' ? $translate->translateText($order->shipment->shipmentStatus->name, $TGGlanguage) : $order->shipment->shipmentStatus->name,
+                            "name" => $isEn ? Translations::shipmentStatus($order->shipment->shipmentStatus->name) : $order->shipment->shipmentStatus->name,
                             "created_at" => isset($order->shipment->date) ? $order->shipment->date : null
                         ]
                         : [
-                            "name" => "En espera para envío"
+                            "name" => $isEn ? "Awaiting shipment" : "En espera para envío"
                         ],
-                    "purchase_status" => $TGGlanguage != 'es' ? $translate->translateText($order->purchaseStatus->name, $TGGlanguage) : $order->purchaseStatus->name,
+                    "purchase_status" => $isEn ? Translations::purchaseStatus($order->purchaseStatus->name) : $order->purchaseStatus->name,
                     "purchase_status_id" => $order->purchase_status_id,
                     "personal_shopper" => $order->personal_shopper,
                     "personal_shopper_info" => isset($order->personalShopper) ? [
@@ -401,7 +402,7 @@ class PurchaseOrderController extends Controller
                     "estimated_date" => $order->estimated_date,
                     "guide_number" => isset($order->shipment->tracking_number) ? $order->shipment->tracking_number : null,
                     "conveyor_id" => $order->conveyor_id,
-                    "carriers" => $TGGlanguage != 'es' ? $translate->translateText($order->carriers, $TGGlanguage) : $order->carriers,
+                    "carriers" => $order->carriers,
                     "purchase_order_details" => $detailsProducts,
                     "taxes" => $taxes
                 ];
