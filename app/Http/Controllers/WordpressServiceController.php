@@ -316,10 +316,6 @@ class WordpressServiceController extends Controller
                 ? $productsQuery->inRandomOrder()->paginate($per_page)
                 : $productsQuery->orderBy('created_at', 'desc')->paginate($per_page);
 
-            if ($products->isEmpty()) {
-                return response()->json(['message' => 'No se encontraron productos.'], 404);
-            }
-
             $formattedProducts = $products->map(function ($product) use ($isEn, $currencyFunctions, $currency) {
                 $rating = round((float)($product->evaluations_avg_rating ?? 0), 1);
 
