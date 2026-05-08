@@ -39,7 +39,7 @@ class Product extends Model
 
     public function getImageAttribute()
     {
-        if (!isset($this->image_product) || $this->image_product === '') return '';
+        if (!isset($this->image_product) || $this->image_product === '' || $this->image_product === '0') return '';
         if (str_starts_with($this->image_product, 'http')) return $this->image_product;
         return url('storage/' . $this->image_product);
     }
