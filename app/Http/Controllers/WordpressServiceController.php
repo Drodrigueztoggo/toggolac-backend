@@ -33,19 +33,18 @@ class WordpressServiceController extends Controller
 
             $currencyFunctions = new CurrencyController();
 
-            // Limit to 300 rows — enough to fill all categories (max ~20 × 6 = 120 needed)
-            // while avoiding a full-table scan on large offer sets.
             $activeOffers = Offer::with([
                 'product.brand',
                 'product' => fn($q) => $q->withAvg('evaluations', 'rating'),
                 'product.categoriesProduct.category',
                 'storeMall',
             ])
-                ->whereNull('deleted_at')
-                ->whereNotNull('product_id')
+                ->whereNull('offers.deleted_at')
+                ->whereNotNull('offers.product_id')
+                ->whereHas('product', fn($q) => $q->whereNull('deleted_at'))
                 ->inRandomOrder()
                 ->limit(300)
-                ->select('id', 'image_offert', 'name', 'description', 'product_id', 'end_date',
+                ->select('offers.id', 'image_offert', 'name', 'description', 'product_id', 'end_date',
                          'discount_price_from', 'discount_price_to',
                          'discount_percentage_from', 'discount_percentage_to', 'store_mall_id')
                 ->get();
@@ -55,21 +54,26 @@ class WordpressServiceController extends Controller
             foreach ($activeOffers as $offer) {
                 if (!$offer->product) continue;
 
-                $cats = $offer->product->categoriesProduct;
-                if ($cats && $cats->isNotEmpty() && $cats->first()->category) {
-                    $cat     = $cats->first()->category;
-                    $catId   = $cat->id;
-                    $catName = $cat->name_category;
+                $cats = $offer->product->categoriesProduct->filter(fn($cp) => $cp->category);
+                if ($cats->isNotEmpty()) {
+                    foreach ($cats as $cp) {
+                        $catId   = $cp->category->id;
+                        $catName = $cp->category->name_category;
+                        if (!isset($grouped[$catId])) {
+                            $grouped[$catId] = ['id' => $catId, 'name' => $catName, 'items' => []];
+                        }
+                        if (count($grouped[$catId]['items']) < 6) {
+                            $grouped[$catId]['items'][] = $offer;
+                        }
+                    }
                 } else {
-                    $catId   = 45;
-                    $catName = 'Tecnología';
-                }
-
-                if (!isset($grouped[$catId])) {
-                    $grouped[$catId] = ['id' => $catId, 'name' => $catName, 'items' => []];
-                }
-                if (count($grouped[$catId]['items']) < 6) {
-                    $grouped[$catId]['items'][] = $offer;
+                    $catId = 45;
+                    if (!isset($grouped[$catId])) {
+                        $grouped[$catId] = ['id' => $catId, 'name' => 'Tecnología', 'items' => []];
+                    }
+                    if (count($grouped[$catId]['items']) < 6) {
+                        $grouped[$catId]['items'][] = $offer;
+                    }
                 }
             }
 
