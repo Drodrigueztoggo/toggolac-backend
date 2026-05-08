@@ -239,7 +239,7 @@ class WordpressServiceController extends Controller
                         'max' => $product->price_to   ? $currencyFunctions->convertAmount('USD', $currency, $product->price_to)   : 0,
                     ],
                     'price_origin' => $product->price_from,
-                    'image'        => asset($product->image),
+                    'image'        => $product->image ?: null,
                 ];
             });
 
@@ -350,7 +350,7 @@ class WordpressServiceController extends Controller
                         'max' => $product->price_to   ? $currencyFunctions->convertAmount('USD', $currency, $product->price_to)   : 0,
                     ],
                     'price_origin' => $product->price_from,
-                    'image'        => asset($product->image),
+                    'image'        => $product->image ?: null,
                     'segment'      => $product->segment,
                 ];
             });

@@ -41,7 +41,7 @@ class Product extends Model
     {
         if (!isset($this->image_product) || $this->image_product === '' || $this->image_product === '0') return '';
         if (str_starts_with($this->image_product, 'http')) return $this->image_product;
-        return url('storage/' . $this->image_product);
+        return secure_url('storage/' . $this->image_product);
     }
 
     public function getImageGalleryAttribute(): array
