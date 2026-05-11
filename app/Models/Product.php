@@ -27,6 +27,10 @@ class Product extends Model
         'gallery',
         'supplier_url',
         'supplier_cost',
+        'sync_frozen',
+        'supplier_in_stock',
+        'supplier_consecutive_errors',
+        'supplier_last_checked_at',
         'segment',
         'lots_category',
     ];
