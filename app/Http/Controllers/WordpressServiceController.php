@@ -22,11 +22,11 @@ class WordpressServiceController extends Controller
             $currency    = $request->currency    ?? 'COP';
             $isEn        = str_starts_with(strtolower((string) $TGGlanguage), 'en');
 
-            // Structure cache is language-only — currency must NOT affect which offers
-            // appear, only their prices. Separating these two concerns ensures the same
-            // catalog is shown regardless of which currency the visitor selects.
-            $structureCacheKey = 'offers_v3_' . md5($TGGlanguage);
-            $rawCached         = Cache::get($structureCacheKey);
+            // Single language-and-currency-independent structure cache.
+            // Switching currency also switches language (es↔en), so keying by either
+            // produced two separate inRandomOrder() sets. Now we cache both name variants
+            // together and select at serve time, guaranteeing identical offer lists.
+            $rawCached = Cache::get('offers_v4');
 
             if ($rawCached === null) {
                 $activeOffers = Offer::with([
@@ -56,7 +56,7 @@ class WordpressServiceController extends Controller
                             $catId   = $cp->category->id;
                             $catName = $cp->category->name_category;
                             if (!isset($grouped[$catId])) {
-                                $grouped[$catId] = ['id' => $catId, 'name' => $catName, 'items' => []];
+                                $grouped[$catId] = ['id' => $catId, 'name_es' => $catName, 'name_en' => Translations::category($catName), 'items' => []];
                             }
                             if (count($grouped[$catId]['items']) < 6) {
                                 $grouped[$catId]['items'][] = $offer;
@@ -65,7 +65,7 @@ class WordpressServiceController extends Controller
                     } else {
                         $catId = 45;
                         if (!isset($grouped[$catId])) {
-                            $grouped[$catId] = ['id' => $catId, 'name' => 'Tecnología', 'items' => []];
+                            $grouped[$catId] = ['id' => $catId, 'name_es' => 'Tecnología', 'name_en' => 'Technology', 'items' => []];
                         }
                         if (count($grouped[$catId]['items']) < 6) {
                             $grouped[$catId]['items'][] = $offer;
@@ -73,17 +73,15 @@ class WordpressServiceController extends Controller
                     }
                 }
 
-                // Build raw structure with USD prices — currency conversion applied later
-                $formatOfferRaw = function ($offert) use ($isEn) {
+                // Store both language variants + raw USD prices
+                $formatOfferRaw = function ($offert) {
                     $rating = $offert->product->evaluations_avg_rating ?? 0;
                     return [
                         'id'            => $offert->id,
-                        'name'          => $isEn
-                            ? ($offert->product->name_product_en ?? $offert->name)
-                            : $offert->name,
-                        'description'   => $isEn
-                            ? ($offert->product->description_product_en ?? $offert->description)
-                            : $offert->description,
+                        'name_es'       => $offert->name,
+                        'name_en'       => $offert->product->name_product_en ?? $offert->name,
+                        'description_es'=> $offert->description,
+                        'description_en'=> $offert->product->description_product_en ?? $offert->description,
                         'product_id'    => $offert->product_id,
                         'end_date'      => $offert->end_date,
                         'store_mall_id' => $offert->store_mall_id,
@@ -103,9 +101,8 @@ class WordpressServiceController extends Controller
                                 'name_brand' => $offert->product->brand->name_brand,
                                 'image'      => $offert->product->brand->image,
                             ] : null,
-                            'name'  => $isEn
-                                ? ($offert->product->name_product_en ?? $offert->product->name_product)
-                                : $offert->product->name_product,
+                            'name_es' => $offert->product->name_product,
+                            'name_en' => $offert->product->name_product_en ?? $offert->product->name_product,
                             'price_usd' => [
                                 'min' => (float) ($offert->product->price_from ?? 0),
                                 'max' => (float) ($offert->product->price_to   ?? 0),
@@ -120,15 +117,16 @@ class WordpressServiceController extends Controller
 
                 $rawCached = ['categoryOffers' => collect(array_values($grouped))
                     ->map(fn($group) => [
-                        'id'     => $group['id'],
-                        'name'   => $isEn ? Translations::category($group['name']) : $group['name'],
-                        'offers' => collect($group['items'])->map($formatOfferRaw)->values(),
+                        'id'      => $group['id'],
+                        'name_es' => $group['name_es'],
+                        'name_en' => $group['name_en'],
+                        'offers'  => collect($group['items'])->map($formatOfferRaw)->values(),
                     ])
                     ->filter(fn($g) => count($g['offers']) > 0)
                     ->values()
                 ];
 
-                Cache::put($structureCacheKey, $rawCached, now()->addMinutes(5));
+                Cache::put('offers_v4', $rawCached, now()->addMinutes(5));
             }
 
             // Compute currency multiplier once (1 DB query) then apply to all prices
@@ -149,17 +147,20 @@ class WordpressServiceController extends Controller
                 'max' => round($usd['max'] * $multiplier, 2),
             ];
 
-            $categoryOffers = collect($rawCached['categoryOffers'])->map(function ($group) use ($applyPrice) {
+            $categoryOffers = collect($rawCached['categoryOffers'])->map(function ($group) use ($applyPrice, $isEn) {
                 return [
                     'id'     => $group['id'],
-                    'name'   => $group['name'],
-                    'offers' => collect($group['offers'])->map(function ($offer) use ($applyPrice) {
-                        $offer['price'] = $applyPrice($offer['price_usd']);
-                        unset($offer['price_usd']);
+                    'name'   => $isEn ? $group['name_en'] : $group['name_es'],
+                    'offers' => collect($group['offers'])->map(function ($offer) use ($applyPrice, $isEn) {
+                        $offer['name']        = $isEn ? $offer['name_en']        : $offer['name_es'];
+                        $offer['description'] = $isEn ? $offer['description_en'] : $offer['description_es'];
+                        $offer['price']       = $applyPrice($offer['price_usd']);
                         if ($offer['product']) {
+                            $offer['product']['name']  = $isEn ? $offer['product']['name_en'] : $offer['product']['name_es'];
                             $offer['product']['price'] = $applyPrice($offer['product']['price_usd']);
-                            unset($offer['product']['price_usd']);
+                            unset($offer['product']['name_es'], $offer['product']['name_en'], $offer['product']['price_usd']);
                         }
+                        unset($offer['name_es'], $offer['name_en'], $offer['description_es'], $offer['description_en'], $offer['price_usd']);
                         return $offer;
                     })->values(),
                 ];
