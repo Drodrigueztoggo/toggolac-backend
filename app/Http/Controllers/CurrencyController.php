@@ -65,32 +65,32 @@ class CurrencyController extends Controller
     {
         try {
 
-            $currencies = [
-                "COP",
-                "USD",
-                "EUR"
-            ];
+            $currencies = ["COP", "USD", "EUR"];
 
-            foreach ($currencies as $key => $currency) {
+            foreach ($currencies as $currencyCode) {
 
-                $toCurrency = json_decode(json_encode($currencies), true);
-
-                $toCurrency = array_diff($toCurrency, array($currency));
-
-                $apiURL = "https://api.fastforex.io/fetch-multi?from=" .  $currency . "&to=" . implode(',', $toCurrency)  . "&api_key=088dfcbe28-2c8ef67df8-s3x7ei";
+                $apiURL = "https://open.er-api.com/v6/latest/" . $currencyCode;
 
                 $response = Http::get($apiURL);
 
-                $statusCode = $response->status();
-                $responseBody = $response->getBody();
+                if (!$response->successful()) {
+                    \Illuminate\Support\Facades\Log::warning("CurrencyController: failed to fetch rates for {$currencyCode}");
+                    continue;
+                }
 
-                $currency = Currency::firstOrNew(['currency_code' => $currency]);
+                $data = $response->json();
 
-                // Establecer los nuevos valores
-                $currency->conversion_rates = $responseBody;
+                // Transform {"rates": {...}} → {"results": {...}} to match convertAmount() expectations
+                $results = [];
+                foreach ($currencies as $target) {
+                    if ($target !== $currencyCode && isset($data['rates'][$target])) {
+                        $results[$target] = $data['rates'][$target];
+                    }
+                }
 
-                // Guardar el modelo (insertar o actualizar)
-                $currency->save();
+                $record = Currency::firstOrNew(['currency_code' => $currencyCode]);
+                $record->conversion_rates = json_encode(['results' => $results]);
+                $record->save();
             }
         } catch (\Exception $e) {
             report($e);
