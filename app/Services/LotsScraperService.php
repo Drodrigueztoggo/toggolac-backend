@@ -161,11 +161,20 @@ class LotsScraperService
     private function parseInStock(string $html): bool
     {
         $lower = strtolower($html);
-        foreach (['out of stock', 'sold out', 'unavailable', 'no longer available', 'item not available'] as $phrase) {
+
+        // Positive signal: add-to-cart button present → product is purchasable
+        if (str_contains($lower, 'add to cart') || str_contains($lower, 'add-to-cart')) {
+            return true;
+        }
+
+        // No add-to-cart: check explicit OOS phrases outside of Vue templates
+        // (888lots embeds "Out Of Stock" in a v-if template on every page)
+        foreach (['sold out', 'no longer available', 'item not available'] as $phrase) {
             if (str_contains($lower, $phrase)) {
                 return false;
             }
         }
-        return true;
+
+        return false; // no buy button and no explicit OOS → treat as unavailable
     }
 }
