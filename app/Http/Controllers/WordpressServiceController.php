@@ -22,123 +22,150 @@ class WordpressServiceController extends Controller
             $currency    = $request->currency    ?? 'COP';
             $isEn        = str_starts_with(strtolower((string) $TGGlanguage), 'en');
 
-            // Full response cache — keyed by currency+language, TTL 5 minutes.
-            // This is the primary fix: translations only run once per cache window
-            // instead of on every request.
-            $cacheKey = 'offers_v2_' . md5($currency . '_' . $TGGlanguage);
-            $cached   = Cache::get($cacheKey);
-            if ($cached !== null) {
-                return response()->json($cached);
-            }
+            // Structure cache is language-only — currency must NOT affect which offers
+            // appear, only their prices. Separating these two concerns ensures the same
+            // catalog is shown regardless of which currency the visitor selects.
+            $structureCacheKey = 'offers_v3_' . md5($TGGlanguage);
+            $rawCached         = Cache::get($structureCacheKey);
 
-            $currencyFunctions = new CurrencyController();
+            if ($rawCached === null) {
+                $activeOffers = Offer::with([
+                    'product.brand',
+                    'product' => fn($q) => $q->withAvg('evaluations', 'rating'),
+                    'product.categoriesProduct.category',
+                    'storeMall',
+                ])
+                    ->whereNull('offers.deleted_at')
+                    ->whereNotNull('offers.product_id')
+                    ->whereHas('product', fn($q) => $q->whereNull('deleted_at'))
+                    ->inRandomOrder()
+                    ->limit(300)
+                    ->select('offers.id', 'image_offert', 'name', 'description', 'product_id', 'end_date',
+                             'discount_price_from', 'discount_price_to',
+                             'discount_percentage_from', 'discount_percentage_to', 'store_mall_id')
+                    ->get();
 
-            $activeOffers = Offer::with([
-                'product.brand',
-                'product' => fn($q) => $q->withAvg('evaluations', 'rating'),
-                'product.categoriesProduct.category',
-                'storeMall',
-            ])
-                ->whereNull('offers.deleted_at')
-                ->whereNotNull('offers.product_id')
-                ->whereHas('product', fn($q) => $q->whereNull('deleted_at'))
-                ->inRandomOrder()
-                ->limit(300)
-                ->select('offers.id', 'image_offert', 'name', 'description', 'product_id', 'end_date',
-                         'discount_price_from', 'discount_price_to',
-                         'discount_percentage_from', 'discount_percentage_to', 'store_mall_id')
-                ->get();
+                // Group offers by primary category (up to 6 per category)
+                $grouped = [];
+                foreach ($activeOffers as $offer) {
+                    if (!$offer->product) continue;
 
-            // Group offers by primary category (up to 6 per category)
-            $grouped = [];
-            foreach ($activeOffers as $offer) {
-                if (!$offer->product) continue;
-
-                $cats = $offer->product->categoriesProduct->filter(fn($cp) => $cp->category);
-                if ($cats->isNotEmpty()) {
-                    foreach ($cats as $cp) {
-                        $catId   = $cp->category->id;
-                        $catName = $cp->category->name_category;
+                    $cats = $offer->product->categoriesProduct->filter(fn($cp) => $cp->category);
+                    if ($cats->isNotEmpty()) {
+                        foreach ($cats as $cp) {
+                            $catId   = $cp->category->id;
+                            $catName = $cp->category->name_category;
+                            if (!isset($grouped[$catId])) {
+                                $grouped[$catId] = ['id' => $catId, 'name' => $catName, 'items' => []];
+                            }
+                            if (count($grouped[$catId]['items']) < 6) {
+                                $grouped[$catId]['items'][] = $offer;
+                            }
+                        }
+                    } else {
+                        $catId = 45;
                         if (!isset($grouped[$catId])) {
-                            $grouped[$catId] = ['id' => $catId, 'name' => $catName, 'items' => []];
+                            $grouped[$catId] = ['id' => $catId, 'name' => 'Tecnología', 'items' => []];
                         }
                         if (count($grouped[$catId]['items']) < 6) {
                             $grouped[$catId]['items'][] = $offer;
                         }
                     }
-                } else {
-                    $catId = 45;
-                    if (!isset($grouped[$catId])) {
-                        $grouped[$catId] = ['id' => $catId, 'name' => 'Tecnología', 'items' => []];
-                    }
-                    if (count($grouped[$catId]['items']) < 6) {
-                        $grouped[$catId]['items'][] = $offer;
+                }
+
+                // Build raw structure with USD prices — currency conversion applied later
+                $formatOfferRaw = function ($offert) use ($isEn) {
+                    $rating = $offert->product->evaluations_avg_rating ?? 0;
+                    return [
+                        'id'            => $offert->id,
+                        'name'          => $isEn
+                            ? ($offert->product->name_product_en ?? $offert->name)
+                            : $offert->name,
+                        'description'   => $isEn
+                            ? ($offert->product->description_product_en ?? $offert->description)
+                            : $offert->description,
+                        'product_id'    => $offert->product_id,
+                        'end_date'      => $offert->end_date,
+                        'store_mall_id' => $offert->store_mall_id,
+                        'price_usd' => [
+                            'min' => (float) ($offert->discount_price_from ?? 0),
+                            'max' => (float) ($offert->discount_price_to   ?? 0),
+                        ],
+                        'percentage' => isset($offert->discount_percentage_to)
+                            ? $offert->discount_percentage_from . '% - ' . $offert->discount_percentage_to . '%'
+                            : $offert->discount_percentage_from . '%',
+                        'image'   => asset($offert->image),
+                        'product' => $offert->product ? [
+                            'id'     => $offert->product->id,
+                            'rating' => round((float) $rating, 1),
+                            'brand'  => $offert->product->brand ? [
+                                'id'         => $offert->product->brand->id,
+                                'name_brand' => $offert->product->brand->name_brand,
+                                'image'      => $offert->product->brand->image,
+                            ] : null,
+                            'name'  => $isEn
+                                ? ($offert->product->name_product_en ?? $offert->product->name_product)
+                                : $offert->product->name_product,
+                            'price_usd' => [
+                                'min' => (float) ($offert->product->price_from ?? 0),
+                                'max' => (float) ($offert->product->price_to   ?? 0),
+                            ],
+                            'image_product' => $offert->product->image,
+                            'image'         => asset($offert->product->image),
+                            'gallery'       => $offert->product->image_gallery,
+                        ] : null,
+                        'store_mall' => $offert->storeMall,
+                    ];
+                };
+
+                $rawCached = ['categoryOffers' => collect(array_values($grouped))
+                    ->map(fn($group) => [
+                        'id'     => $group['id'],
+                        'name'   => $isEn ? Translations::category($group['name']) : $group['name'],
+                        'offers' => collect($group['items'])->map($formatOfferRaw)->values(),
+                    ])
+                    ->filter(fn($g) => count($g['offers']) > 0)
+                    ->values()
+                ];
+
+                Cache::put($structureCacheKey, $rawCached, now()->addMinutes(5));
+            }
+
+            // Compute currency multiplier once (1 DB query) then apply to all prices
+            $multiplier = 1.0;
+            if ($currency !== 'USD') {
+                $rateRow = Currency::where('currency_code', 'USD')->value('conversion_rates');
+                if ($rateRow) {
+                    $rates = json_decode($rateRow);
+                    if (isset($rates->results->$currency)) {
+                        $rate       = $rates->results->$currency;
+                        $multiplier = $rate * 1.09;
                     }
                 }
             }
 
-            // Format helper — uses pre-translated name_product_en when available,
-            // falls back to translateText only for offer name/description (not brands,
-            // which are almost always English already).
-            $formatOffer = function ($offert) use ($isEn, $currencyFunctions, $currency) {
-                $rating = $offert->product->evaluations_avg_rating ?? 0;
+            $applyPrice = fn(array $usd) => [
+                'min' => round($usd['min'] * $multiplier, 2),
+                'max' => round($usd['max'] * $multiplier, 2),
+            ];
 
+            $categoryOffers = collect($rawCached['categoryOffers'])->map(function ($group) use ($applyPrice) {
                 return [
-                    'id'            => $offert->id,
-                    'name'          => $isEn
-                        ? ($offert->product->name_product_en ?? $offert->name)
-                        : $offert->name,
-                    'description'   => $isEn
-                        ? ($offert->product->description_product_en ?? $offert->description)
-                        : $offert->description,
-                    'product_id'    => $offert->product_id,
-                    'end_date'      => $offert->end_date,
-                    'store_mall_id' => $offert->store_mall_id,
-                    'price' => [
-                        'min' => $offert->discount_price_from ? $currencyFunctions->convertAmount('USD', $currency, $offert->discount_price_from) : 0,
-                        'max' => $offert->discount_price_to   ? $currencyFunctions->convertAmount('USD', $currency, $offert->discount_price_to)   : 0,
-                    ],
-                    'percentage' => isset($offert->discount_percentage_to)
-                        ? $offert->discount_percentage_from . '% - ' . $offert->discount_percentage_to . '%'
-                        : $offert->discount_percentage_from . '%',
-                    'image'   => asset($offert->image),
-                    'product' => $offert->product ? [
-                        'id'     => $offert->product->id,
-                        'rating' => round((float) $rating, 1),
-                        'brand'  => $offert->product->brand ? [
-                            'id'         => $offert->product->brand->id,
-                            'name_brand' => $offert->product->brand->name_brand,
-                            'image'      => $offert->product->brand->image,
-                        ] : null,
-                        'name'  => $isEn
-                            ? ($offert->product->name_product_en ?? $offert->product->name_product)
-                            : $offert->product->name_product,
-                        'price' => [
-                            'min' => $offert->product->price_from ? $currencyFunctions->convertAmount('USD', $currency, $offert->product->price_from) : 0,
-                            'max' => $offert->product->price_to   ? $currencyFunctions->convertAmount('USD', $currency, $offert->product->price_to)   : 0,
-                        ],
-                        'image_product' => $offert->product->image,
-                        'image'         => asset($offert->product->image),
-                        'gallery'       => $offert->product->image_gallery,
-                    ] : null,
-                    'store_mall' => $offert->storeMall,
-                ];
-            };
-
-            // Build categoryOffers array (only categories with ≥1 offer)
-            $categoryOffers = collect(array_values($grouped))
-                ->map(fn($group) => [
                     'id'     => $group['id'],
-                    'name'   => $isEn ? Translations::category($group['name']) : $group['name'],
-                    'offers' => collect($group['items'])->map($formatOffer)->values(),
-                ])
-                ->filter(fn($g) => count($g['offers']) > 0)
-                ->values();
+                    'name'   => $group['name'],
+                    'offers' => collect($group['offers'])->map(function ($offer) use ($applyPrice) {
+                        $offer['price'] = $applyPrice($offer['price_usd']);
+                        unset($offer['price_usd']);
+                        if ($offer['product']) {
+                            $offer['product']['price'] = $applyPrice($offer['product']['price_usd']);
+                            unset($offer['product']['price_usd']);
+                        }
+                        return $offer;
+                    })->values(),
+                ];
+            })->values();
 
-            $result = ['categoryOffers' => $categoryOffers];
-            Cache::put($cacheKey, $result, now()->addMinutes(5));
-
-            return response()->json($result);
+            return response()->json(['categoryOffers' => $categoryOffers]);
         } catch (\Exception $e) {
             report($e);
             return response()->json(['error' => 'Ocurrió un error en el servidor.'], 500);
