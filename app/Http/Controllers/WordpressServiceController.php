@@ -38,38 +38,41 @@ class WordpressServiceController extends Controller
                     ->whereNull('offers.deleted_at')
                     ->whereNotNull('offers.product_id')
                     ->whereHas('product', fn($q) => $q->whereNull('deleted_at'))
-                    ->inRandomOrder()
+                    ->orderByDesc('offers.id')
                     ->limit(300)
                     ->select('offers.id', 'image_offert', 'name', 'description', 'product_id', 'end_date',
                              'discount_price_from', 'discount_price_to',
                              'discount_percentage_from', 'discount_percentage_to', 'store_mall_id')
                     ->get();
 
-                // Group offers by primary category (up to 6 per category)
+                // Group offers by PRIMARY category only (first assigned category).
+                // Using all categories caused products to appear in multiple sections,
+                // making them look miscategorized.
                 $grouped = [];
                 foreach ($activeOffers as $offer) {
                     if (!$offer->product) continue;
 
-                    $cats = $offer->product->categoriesProduct->filter(fn($cp) => $cp->category);
-                    if ($cats->isNotEmpty()) {
-                        foreach ($cats as $cp) {
-                            $catId   = $cp->category->id;
-                            $catName = $cp->category->name_category;
-                            if (!isset($grouped[$catId])) {
-                                $grouped[$catId] = ['id' => $catId, 'name_es' => $catName, 'name_en' => Translations::category($catName), 'items' => []];
-                            }
-                            if (count($grouped[$catId]['items']) < 6) {
-                                $grouped[$catId]['items'][] = $offer;
-                            }
-                        }
+                    $primaryCat = $offer->product->categoriesProduct
+                        ->first(fn($cp) => $cp->category);
+
+                    if ($primaryCat) {
+                        $catId   = $primaryCat->category->id;
+                        $catName = $primaryCat->category->name_category;
                     } else {
-                        $catId = 45;
-                        if (!isset($grouped[$catId])) {
-                            $grouped[$catId] = ['id' => $catId, 'name_es' => 'Tecnología', 'name_en' => 'Technology', 'items' => []];
-                        }
-                        if (count($grouped[$catId]['items']) < 6) {
-                            $grouped[$catId]['items'][] = $offer;
-                        }
+                        $catId   = 45;
+                        $catName = 'Tecnología';
+                    }
+
+                    if (!isset($grouped[$catId])) {
+                        $grouped[$catId] = [
+                            'id'      => $catId,
+                            'name_es' => $catName,
+                            'name_en' => Translations::category($catName),
+                            'items'   => [],
+                        ];
+                    }
+                    if (count($grouped[$catId]['items']) < 6) {
+                        $grouped[$catId]['items'][] = $offer;
                     }
                 }
 
@@ -126,7 +129,7 @@ class WordpressServiceController extends Controller
                     ->values()
                 ];
 
-                Cache::put('offers_v4', $rawCached, now()->addMinutes(5));
+                Cache::put('offers_v4', $rawCached, now()->addHour());
             }
 
             // Compute currency multiplier once (1 DB query) then apply to all prices
