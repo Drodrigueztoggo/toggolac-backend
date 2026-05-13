@@ -17,7 +17,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         // $schedule->command('inspire')->hourly();
-        $schedule->command('currencies:update');
+        $schedule->command('currencies:update')->dailyAt('06:00');
 
         // Price sync: every 6 hours for all active 888lots products
         $schedule->job(new ProductPriceSyncJob)->everySixHours();
