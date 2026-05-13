@@ -17,8 +17,7 @@ class ProductPriceSyncJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    private const MAX_CONSECUTIVE_ERRORS   = 3;
-    private const OOS_RECHECK_HOURS        = 48;
+    private const MAX_CONSECUTIVE_ERRORS = 3;
 
     public function handle(LotsScraperService $scraper): void
     {
@@ -64,20 +63,15 @@ class ProductPriceSyncJob implements ShouldQueue
         // ── Rule 4: out of stock ───────────────────────────────────────────
         if (! $inStock) {
             if ($product->supplier_in_stock) {
-                // Just went OOS — hide and alert
+                // First OOS detection — flag it, check again next run (~6h)
                 $product->supplier_in_stock = false;
-                $this->unpublish($product);
-                $this->alert($product, '📦 Sin stock — Ocultado automáticamente', [
-                    ['text' => '⏳ Esperar 48h', 'callback_data' => "wait_oos:{$product->id}"],
-                    ['text' => '❌ Archivar ya',  'callback_data' => "archive:{$product->id}"],
-                ]);
-            } elseif ($product->supplier_last_checked_at &&
-                      now()->diffInHours($product->supplier_last_checked_at) >= self::OOS_RECHECK_HOURS) {
-                // Still OOS after 48h → archive
+                $product->save();
+                $this->alert($product, '📦 Sin stock — se archivará en el próximo ciclo (~6h)', []);
+            } else {
+                // Still OOS on second check → archive automatically
                 $this->archive($product);
-                $this->alert($product, '❌ Archivado — Sin stock por más de 48h', []);
+                $this->alert($product, '❌ Archivado automáticamente — sin stock confirmado', []);
             }
-            $product->save();
             return;
         }
 
